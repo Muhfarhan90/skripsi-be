@@ -31,7 +31,10 @@ class User extends Authenticatable implements MustVerifyEmail
         'address',
         'school_origin',
         'date_of_birth',
-        'bio'
+        'bio',
+        'is_active',
+        'avatar',
+        'gender',
     ];
 
     /**
@@ -55,5 +58,10 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class, 'role_id');
     }
 }
