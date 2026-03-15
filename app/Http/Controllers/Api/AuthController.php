@@ -30,10 +30,9 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => $result['message'] ?? 'Register successfully',
-            'user' => new UserResource($result['user']),
-            'email_notification_status' => $result['email_notification_status'] ?? null,
-            'verification_url' => $result['verification_url'] ?? null,
-            'frontend_verification_url' => $result['frontend_verification_url'] ?? null,
+            'data' => [
+                'user' => new UserResource($result['user']),
+            ],
         ]);
     }
 
@@ -44,8 +43,10 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Login successfully',
-            'token' => $result['token'],
-            'user' => new UserResource($result['user'])
+            'data' => [
+                'token' => $result['token'],
+                'user' => new UserResource($result['user'])
+            ]
         ]);
     }
 
@@ -84,10 +85,9 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => $result['message'],
-            'retry_after' => $result['retry_after'] ?? null,
-            'email_notification_status' => $result['email_notification_status'] ?? null,
-            'verification_url' => $result['verification_url'] ?? null,
-            'frontend_verification_url' => $result['frontend_verification_url'] ?? null,
+            'data' => [
+                'retry_after' => $result['retry_after'] ?? null
+            ]
         ]);
     }
     public function forgotPassword(ForgotPasswordRequest $request)
@@ -102,7 +102,7 @@ class AuthController extends Controller
 
     public function resetPassword(ResetPasswordRequest $request)
     {
-        $result = $this->authService->resetPassword($request->input('token'), $request->input('password'));
+        $result = $this->authService->resetPassword($request->input('email'), $request->input('token'), $request->input('password'));
 
         return response()->json([
             'success' => true,

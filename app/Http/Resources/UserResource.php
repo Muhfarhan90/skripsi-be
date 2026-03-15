@@ -26,8 +26,8 @@ class UserResource extends JsonResource
             'date_of_birth' => $this->date_of_birth,
             'school_origin' => $this->school_origin,
             'role' => new RoleResource($this->whenLoaded('role')),
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            'created_at' => $this->created_at->format('Y-m-d H:i:s'),
+            'updated_at' => $this->updated_at->format('Y-m-d H:i:s'),
         ];
     }
 }
