@@ -28,6 +28,7 @@ return new class extends Migration
             $table->integer('total_students')->default(0);
             $table->double('rating')->default(0);
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
