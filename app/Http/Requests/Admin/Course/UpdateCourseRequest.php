@@ -24,7 +24,6 @@ class UpdateCourseRequest extends FormRequest
     {
         return [
             'title' => 'sometimes|required|string|max:255',
-            'slug' => 'sometimes|required|string|max:255|unique:courses,slug,' . $this->route('course'),
             'description' => 'nullable|string',
             'category_id' => 'sometimes|required|exists:categories,id',
             'instructor_id' => 'sometimes|required|exists:users,id',

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Category;
+use Illuminate\Support\Str;
 
 class CategoryService
 {
@@ -18,6 +19,7 @@ class CategoryService
 
     public function create(array $data)
     {
+        $data['slug'] = Str::slug($data['name']);
         return Category::create($data);
     }
 
@@ -25,6 +27,9 @@ class CategoryService
     {
         $category = $this->findById($id);
 
+        if (isset($data['name'])) {
+            $data['slug'] = Str::slug($data['name']);
+        }
         $category->update($data);
 
         return $category;

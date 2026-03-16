@@ -24,7 +24,6 @@ class StoreCourseRequest extends FormRequest
     {
         return [
             'title' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:courses,slug',
             'description' => 'nullable|string',
             'category_id' => 'required|exists:categories,id',
             'instructor_id' => 'required|exists:users,id',

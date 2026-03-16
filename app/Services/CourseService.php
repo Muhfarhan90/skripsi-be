@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Course;
+use Illuminate\Support\Str;
 
 class CourseService
 {
@@ -18,13 +19,16 @@ class CourseService
 
     public function create(array $data)
     {
+        $data['slug'] = Str::slug($data['title']);
         return Course::create($data);
     }
 
     public function update(int $id, array $data)
     {
         $course = $this->findById($id);
-
+        if (isset($data['title'])) {
+            $data['slug'] = Str::slug($data['title']);
+        }
         $course->update($data);
 
         return $course;
