@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Api\Admin\CategoryController;
 use App\Http\Controllers\Api\Admin\CourseController;
+use App\Http\Controllers\Api\Admin\LessonController;
+use App\Http\Controllers\Api\Admin\SectionController;
 use App\Http\Controllers\Api\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -23,3 +25,5 @@ Route::prefix('auth')->group(function () {
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/courses', CourseController::class)->middleware('auth:sanctum');
+Route::apiResource('admin/sections', SectionController::class)->middleware('auth:sanctum');
+Route::apiResource('admin/lessons', LessonController::class)->middleware('auth:sanctum');
