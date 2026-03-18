@@ -16,8 +16,10 @@ class UserResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'role_id' => $this->role_id,
             'fullname' => $this->fullname,
             'email' => $this->email,
+            'nisn' => $this->nisn,
             'phone' => $this->phone,
             'address' => $this->address,
             'avatar' => $this->avatar,
@@ -25,7 +27,7 @@ class UserResource extends JsonResource
             'bio' => $this->bio,
             'date_of_birth' => $this->date_of_birth,
             'school_origin' => $this->school_origin,
-            'role' => new RoleResource($this->whenLoaded('role')),
+            'is_active' => $this->is_active,
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at->format('Y-m-d H:i:s'),
         ];
