@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\CategoryController;
 use App\Http\Controllers\Api\Admin\CourseController;
 use App\Http\Controllers\Api\Admin\LessonController;
+use App\Http\Controllers\Api\Admin\QuestionController;
 use App\Http\Controllers\Api\Admin\QuizController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SectionController;
@@ -31,5 +32,6 @@ Route::apiResource('admin/courses', CourseController::class)->middleware('auth:s
 Route::apiResource('admin/sections', SectionController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/lessons', LessonController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/quizzes', QuizController::class)->middleware('auth:sanctum');
+Route::apiResource('admin/questions', QuestionController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/users', UserController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware('auth:sanctum');

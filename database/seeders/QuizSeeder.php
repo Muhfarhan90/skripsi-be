@@ -23,6 +23,7 @@ class QuizSeeder extends Seeder
                 'passing_score' => 70,
                 'weight' => 10,
                 'is_active' => true,
+                'is_random' => false,
                 'max_attempts' => 3,
             ],
             [
@@ -34,6 +35,7 @@ class QuizSeeder extends Seeder
                 'passing_score' => 75,
                 'weight' => 15,
                 'is_active' => true,
+                'is_random' => false,
                 'max_attempts' => 3,
             ],
             [
@@ -45,6 +47,7 @@ class QuizSeeder extends Seeder
                 'passing_score' => 80,
                 'weight' => 20,
                 'is_active' => true,
+                'is_random' => false,
                 'max_attempts' => 3,
             ],
         ];

@@ -21,6 +21,7 @@ return new class extends Migration
             $table->integer('passing_score')->default(0);
             $table->integer('weight')->default(0);
             $table->boolean('is_active')->default(true);
+            $table->boolean('is_random')->default(false);
             $table->integer('max_attempts')->default(0); // 0 for unlimited
             $table->timestamps();
         });

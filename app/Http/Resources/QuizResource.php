@@ -19,6 +19,8 @@ class QuizResource extends JsonResource
             'passing_score' => $this->passing_score,
             'weight' => $this->weight,
             'is_active' => $this->is_active,
+            'is_random' => $this->is_random,
+            'max_attempts' => $this->max_attempts,
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];

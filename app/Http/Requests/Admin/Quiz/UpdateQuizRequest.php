@@ -23,6 +23,7 @@ use Illuminate\Foundation\Http\FormRequest;
             'passing_score' => ['nullable', 'integer'],
             'weight' => ['nullable', 'integer'],
             'is_active' => ['nullable', 'boolean'],
+            'is_random' => ['nullable', 'boolean'],
             'max_attempts' => ['nullable', 'integer'],
         ];
     }
