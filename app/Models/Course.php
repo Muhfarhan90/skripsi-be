@@ -37,4 +37,9 @@ class Course extends Model
     {
         return $this->hasMany(Section::class, 'course_id');
     }
+
+    public function quizzes()
+    {
+        return $this->hasMany(Quiz::class, 'quiz_id');
+    }
 }
