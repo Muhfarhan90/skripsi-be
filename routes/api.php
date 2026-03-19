@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\Admin\QuestionController;
 use App\Http\Controllers\Api\Admin\QuizController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SectionController;
+use App\Http\Controllers\Api\Admin\TransactionController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VoucherController;
 use App\Http\Controllers\Api\AuthController;
@@ -37,5 +38,6 @@ Route::apiResource('admin/quizzes', QuizController::class)->middleware('auth:san
 Route::apiResource('admin/questions', QuestionController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/options', OptionController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/vouchers', VoucherController::class)->middleware('auth:sanctum');
+Route::apiResource('admin/transactions', TransactionController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/users', UserController::class)->middleware('auth:sanctum');
 Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware('auth:sanctum');
