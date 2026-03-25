@@ -28,6 +28,8 @@ class DatabaseSeeder extends Seeder
             TransactionSeeder::class,
             EnrollmentSeeder::class,
             LessonProgressSeeder::class,
+            QuizAttemptSeeder::class,
+            QuizAnswerSeeder::class,
         ]);
     }
 }

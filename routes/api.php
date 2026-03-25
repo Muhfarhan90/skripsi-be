@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Admin\EnrollmentController as AdminEnrollmentContro
 use App\Http\Controllers\Api\Admin\LessonController;
 use App\Http\Controllers\Api\Admin\LessonProgressController as AdminLessonProgressController;
 use App\Http\Controllers\Api\Admin\OptionController;
+use App\Http\Controllers\Api\Admin\QuizAttemptController as AdminQuizAttemptController;
 use App\Http\Controllers\Api\Admin\QuestionController;
 use App\Http\Controllers\Api\Admin\QuizController;
 use App\Http\Controllers\Api\Admin\RoleController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VoucherController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\LessonProgressController;
+use App\Http\Controllers\Api\QuizAttemptController;
 use App\Http\Controllers\Api\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -46,6 +48,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/enrollments/{enrollmentId}/lesson-progress', [LessonProgressController::class, 'index']);
     Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [LessonProgressController::class, 'show']);
     Route::put('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [LessonProgressController::class, 'upsert']);
+
+    Route::get('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts', [QuizAttemptController::class, 'index']);
+    Route::post('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts', [QuizAttemptController::class, 'store']);
+    Route::get('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts/{attemptId}', [QuizAttemptController::class, 'show']);
+    Route::put('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts/{attemptId}/answers/{questionId}', [QuizAttemptController::class, 'upsertAnswer']);
+    Route::post('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts/{attemptId}/submit', [QuizAttemptController::class, 'submit']);
 });
 
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
@@ -59,6 +67,10 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('/enrollments/{enrollmentId}/lesson-progress', [AdminLessonProgressController::class, 'index']);
     Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'show']);
     Route::put('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'upsert']);
+
+    Route::get('/quizzes/{quizId}/attempts', [AdminQuizAttemptController::class, 'index']);
+    Route::get('/quizzes/{quizId}/attempts/{attemptId}', [AdminQuizAttemptController::class, 'show']);
+    Route::put('/quizzes/{quizId}/attempts/{attemptId}/answers/{questionId}/grade', [AdminQuizAttemptController::class, 'gradeAnswer']);
 });
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware('auth:sanctum');

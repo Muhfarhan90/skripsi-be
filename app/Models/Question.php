@@ -20,4 +20,14 @@ class Question extends Model
     {
         return $this->belongsTo(Quiz::class, 'quiz_id');
     }
+
+    public function options()
+    {
+        return $this->hasMany(Option::class, 'question_id');
+    }
+
+    public function answers()
+    {
+        return $this->hasMany(QuizAnswer::class, 'question_id');
+    }
 }
