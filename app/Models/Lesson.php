@@ -21,4 +21,9 @@ class Lesson extends Model
     {
         return $this->belongsTo(Section::class, 'section_id');
     }
+
+    public function lessonProgresses()
+    {
+        return $this->hasMany(LessonProgress::class);
+    }
 }

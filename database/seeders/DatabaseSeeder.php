@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             VoucherSeeder::class,
             TransactionSeeder::class,
             EnrollmentSeeder::class,
+            LessonProgressSeeder::class,
         ]);
     }
 }

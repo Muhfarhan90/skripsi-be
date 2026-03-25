@@ -17,6 +17,11 @@ class Enrollment extends Model
         'expired_at',
     ];
 
+    protected $casts = [
+        'completed_at' => 'datetime',
+        'expired_at' => 'datetime',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -35,5 +40,10 @@ class Enrollment extends Model
     public function lastLesson()
     {
         return $this->belongsTo(Lesson::class, 'last_lesson_id');
+    }
+
+    public function lessonProgresses()
+    {
+        return $this->hasMany(LessonProgress::class);
     }
 }

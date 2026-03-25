@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\Admin\SectionController;
 use App\Http\Controllers\Api\Admin\TransactionController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VoucherController;
+use App\Http\Controllers\Api\EnrollmentController;
+use App\Http\Controllers\Api\LessonProgressController;
 use App\Http\Controllers\Api\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +30,18 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/enrollments', [EnrollmentController::class, 'index']);
+    Route::post('/enrollments', [EnrollmentController::class, 'store']);
+    Route::get('/enrollments/{id}', [EnrollmentController::class, 'show']);
+    Route::post('/enrollments/{id}/complete', [EnrollmentController::class, 'complete']);
+    Route::get('/courses/{courseId}/enrollment-status', [EnrollmentController::class, 'status']);
+
+    Route::get('/lesson-progress', [LessonProgressController::class, 'index']);
+    Route::post('/lesson-progress', [LessonProgressController::class, 'store']);
+    Route::get('/lesson-progress/{id}', [LessonProgressController::class, 'show']);
 });
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware('auth:sanctum');
