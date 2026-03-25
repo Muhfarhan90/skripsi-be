@@ -26,18 +26,62 @@ class LessonProgressService
             ->paginate(10);
     }
 
-    public function findByIdForUser(int $userId, int $id): LessonProgress
+    public function getByEnrollmentForAdmin(int $enrollmentId)
     {
-        return LessonProgress::whereHas('enrollment', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
-            })
-            ->findOrFail($id);
+        $this->findEnrollmentForAdmin($enrollmentId);
+
+        return LessonProgress::where('enrollment_id', $enrollmentId)
+            ->latest()
+            ->paginate(10);
     }
 
-    public function upsert(int $userId, array $data): LessonProgress
+    public function findByEnrollmentAndLessonForUser(int $userId, int $enrollmentId, int $lessonId): LessonProgress
     {
-        $enrollment = $this->findEnrollmentForUser($userId, (int) $data['enrollment_id']);
-        $lesson = Lesson::with('section')->findOrFail((int) $data['lesson_id']);
+        $this->findEnrollmentForUser($userId, $enrollmentId);
+
+        return LessonProgress::where('enrollment_id', $enrollmentId)
+            ->where('lesson_id', $lessonId)
+            ->firstOrFail();
+    }
+
+    public function findByEnrollmentAndLessonForAdmin(int $enrollmentId, int $lessonId): LessonProgress
+    {
+        $this->findEnrollmentForAdmin($enrollmentId);
+
+        return LessonProgress::where('enrollment_id', $enrollmentId)
+            ->where('lesson_id', $lessonId)
+            ->firstOrFail();
+    }
+
+    public function upsertByEnrollmentAndLesson(int $userId, int $enrollmentId, int $lessonId, array $data): LessonProgress
+    {
+        $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
+
+        return $this->persistProgress($enrollment, $lessonId, $data);
+    }
+
+    public function upsertForAdmin(int $enrollmentId, int $lessonId, array $data): LessonProgress
+    {
+        $enrollment = $this->findEnrollmentForAdmin($enrollmentId);
+
+        return $this->persistProgress($enrollment, $lessonId, $data);
+    }
+
+    private function findEnrollmentForUser(int $userId, int $enrollmentId): Enrollment
+    {
+        return Enrollment::where('id', $enrollmentId)
+            ->where('user_id', $userId)
+            ->firstOrFail();
+    }
+
+    private function findEnrollmentForAdmin(int $enrollmentId): Enrollment
+    {
+        return Enrollment::findOrFail($enrollmentId);
+    }
+
+    private function persistProgress(Enrollment $enrollment, int $lessonId, array $data): LessonProgress
+    {
+        $lesson = Lesson::with('section')->findOrFail($lessonId);
 
         if (! $lesson->section || (int) $lesson->section->course_id !== (int) $enrollment->course_id) {
             throw ValidationException::withMessages([
@@ -79,12 +123,5 @@ class LessonProgressService
 
             return $progress->fresh();
         });
-    }
-
-    private function findEnrollmentForUser(int $userId, int $enrollmentId): Enrollment
-    {
-        return Enrollment::where('id', $enrollmentId)
-            ->where('user_id', $userId)
-            ->firstOrFail();
     }
 }

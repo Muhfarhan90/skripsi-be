@@ -25,10 +25,12 @@ class EnrollmentService
             ->findOrFail($id);
     }
 
-    public function enrollmentStatus(int $userId, int $courseId): array
+    public function enrollmentStatusByCourseId(int $userId, int $courseId): array
     {
+        $course = Course::findOrFail($courseId);
+
         $enrollment = Enrollment::where('user_id', $userId)
-            ->where('course_id', $courseId)
+            ->where('course_id', $course->id)
             ->first();
 
         if (! $enrollment) {
@@ -49,9 +51,9 @@ class EnrollmentService
         ];
     }
 
-    public function create(int $userId, array $data): Enrollment
+    public function createByCourseId(int $userId, int $courseId, array $data): Enrollment
     {
-        $course = Course::findOrFail((int) $data['course_id']);
+        $course = Course::findOrFail($courseId);
         $transactionId = isset($data['transaction_id']) ? (int) $data['transaction_id'] : null;
 
         if ($course->status !== 'published') {
@@ -65,7 +67,9 @@ class EnrollmentService
             ->first();
 
         if ($existing) {
-            return $existing;
+            throw ValidationException::withMessages([
+                'course_id' => ['User is already enrolled in this course'],
+            ]);
         }
 
         $price = (float) ($course->discount_price > 0 ? $course->discount_price : $course->price);
@@ -134,6 +138,86 @@ class EnrollmentService
                 'completed_at' => now(),
             ]);
         }
+
+        return $enrollment->fresh();
+    }
+
+    public function progressSummary(int $userId, int $id): array
+    {
+        $ownedEnrollment = $this->findByIdForUser($userId, $id);
+        $enrollment = $this->syncProgress($ownedEnrollment->id);
+
+        $totalLessons = Lesson::whereHas('section', function ($query) use ($enrollment) {
+            $query->where('course_id', $enrollment->course_id);
+        })->count();
+
+        $completedLessons = LessonProgress::where('enrollment_id', $enrollment->id)
+            ->whereNotNull('completed_at')
+            ->count();
+
+        return [
+            'enrollment_id' => $enrollment->id,
+            'total_lessons' => $totalLessons,
+            'completed_lessons' => $completedLessons,
+            'remaining_lessons' => max(0, $totalLessons - $completedLessons),
+            'progress' => $enrollment->progress,
+            'status' => $enrollment->status,
+            'completed_at' => $enrollment->completed_at?->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    public function nextLesson(int $userId, int $id): ?Lesson
+    {
+        $enrollment = $this->findByIdForUser($userId, $id);
+
+        $completedLessonIds = LessonProgress::where('enrollment_id', $enrollment->id)
+            ->whereNotNull('completed_at')
+            ->pluck('lesson_id');
+
+        return Lesson::query()
+            ->select('lessons.*')
+            ->join('sections', 'sections.id', '=', 'lessons.section_id')
+            ->where('sections.course_id', $enrollment->course_id)
+            ->whereNotIn('lessons.id', $completedLessonIds)
+            ->orderBy('sections.sort_order')
+            ->orderBy('lessons.sort_order')
+            ->orderBy('lessons.id')
+            ->first();
+    }
+
+    public function getAllForAdmin()
+    {
+        return Enrollment::latest()->paginate(10);
+    }
+
+    public function findByIdForAdmin(int $id): Enrollment
+    {
+        return Enrollment::findOrFail($id);
+    }
+
+    public function getByCourseIdForAdmin(int $courseId)
+    {
+        $course = Course::findOrFail($courseId);
+
+        return Enrollment::where('course_id', $course->id)
+            ->latest()
+            ->paginate(10);
+    }
+
+    public function updateStatusForAdmin(int $id, string $status): Enrollment
+    {
+        $enrollment = $this->findByIdForAdmin($id);
+
+        $payload = ['status' => $status];
+        if ($status === 'completed') {
+            $payload['completed_at'] = now();
+            $payload['progress'] = 100;
+        }
+        if ($status === 'active') {
+            $payload['completed_at'] = null;
+        }
+
+        $enrollment->update($payload);
 
         return $enrollment->fresh();
     }

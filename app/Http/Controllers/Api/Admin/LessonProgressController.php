@@ -1,12 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LessonProgress\UpsertLessonProgressRequest;
 use App\Http\Resources\LessonProgressResource;
 use App\Services\LessonProgressService;
-use Illuminate\Http\Request;
 
 class LessonProgressController extends Controller
 {
@@ -17,12 +16,9 @@ class LessonProgressController extends Controller
         $this->service = $lessonProgressService;
     }
 
-    public function index(Request $request, string $enrollmentId)
+    public function index(string $enrollmentId)
     {
-        $progress = $this->service->getByEnrollment(
-            (int) $request->user()->id,
-            (int) $enrollmentId
-        );
+        $progress = $this->service->getByEnrollmentForAdmin((int) $enrollmentId);
 
         return response()->json([
             'success' => true,
@@ -37,13 +33,9 @@ class LessonProgressController extends Controller
         ]);
     }
 
-    public function show(Request $request, string $enrollmentId, string $lessonId)
+    public function show(string $enrollmentId, string $lessonId)
     {
-        $progress = $this->service->findByEnrollmentAndLessonForUser(
-            (int) $request->user()->id,
-            (int) $enrollmentId,
-            (int) $lessonId
-        );
+        $progress = $this->service->findByEnrollmentAndLessonForAdmin((int) $enrollmentId, (int) $lessonId);
 
         return response()->json([
             'success' => true,
@@ -54,8 +46,7 @@ class LessonProgressController extends Controller
 
     public function upsert(UpsertLessonProgressRequest $request, string $enrollmentId, string $lessonId)
     {
-        $progress = $this->service->upsertByEnrollmentAndLesson(
-            (int) $request->user()->id,
+        $progress = $this->service->upsertForAdmin(
             (int) $enrollmentId,
             (int) $lessonId,
             $request->validated()

@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Api\Admin\CategoryController;
 use App\Http\Controllers\Api\Admin\CourseController;
+use App\Http\Controllers\Api\Admin\EnrollmentController as AdminEnrollmentController;
 use App\Http\Controllers\Api\Admin\LessonController;
+use App\Http\Controllers\Api\Admin\LessonProgressController as AdminLessonProgressController;
 use App\Http\Controllers\Api\Admin\OptionController;
 use App\Http\Controllers\Api\Admin\QuestionController;
 use App\Http\Controllers\Api\Admin\QuizController;
@@ -34,14 +36,29 @@ Route::prefix('auth')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/enrollments', [EnrollmentController::class, 'index']);
-    Route::post('/enrollments', [EnrollmentController::class, 'store']);
     Route::get('/enrollments/{id}', [EnrollmentController::class, 'show']);
+    Route::get('/enrollments/{id}/progress-summary', [EnrollmentController::class, 'progressSummary']);
+    Route::get('/enrollments/{id}/next-lesson', [EnrollmentController::class, 'nextLesson']);
     Route::post('/enrollments/{id}/complete', [EnrollmentController::class, 'complete']);
-    Route::get('/courses/{courseId}/enrollment-status', [EnrollmentController::class, 'status']);
+    Route::post('/courses/{courseId}/enroll', [EnrollmentController::class, 'storeByCourse']);
+    Route::get('/courses/{courseId}/enrollment-status', [EnrollmentController::class, 'statusByCourse']);
 
-    Route::get('/lesson-progress', [LessonProgressController::class, 'index']);
-    Route::post('/lesson-progress', [LessonProgressController::class, 'store']);
-    Route::get('/lesson-progress/{id}', [LessonProgressController::class, 'show']);
+    Route::get('/enrollments/{enrollmentId}/lesson-progress', [LessonProgressController::class, 'index']);
+    Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [LessonProgressController::class, 'show']);
+    Route::put('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [LessonProgressController::class, 'upsert']);
+});
+
+Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
+    Route::get('/enrollments', [AdminEnrollmentController::class, 'index']);
+    Route::get('/enrollments/{id}', [AdminEnrollmentController::class, 'show']);
+    Route::get('/courses/{courseId}/enrollments', [AdminEnrollmentController::class, 'byCourse']);
+    Route::post('/courses/{courseId}/enroll', [AdminEnrollmentController::class, 'storeByCourse']);
+    Route::patch('/enrollments/{id}/status', [AdminEnrollmentController::class, 'updateStatus']);
+    Route::post('/enrollments/{id}/sync-progress', [AdminEnrollmentController::class, 'syncProgress']);
+
+    Route::get('/enrollments/{enrollmentId}/lesson-progress', [AdminLessonProgressController::class, 'index']);
+    Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'show']);
+    Route::put('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'upsert']);
 });
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware('auth:sanctum');

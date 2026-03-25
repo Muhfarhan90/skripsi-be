@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Requests\Enrollment;
+namespace App\Http\Requests\Admin\Enrollment;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreEnrollmentRequest extends FormRequest
+class UpdateEnrollmentStatusRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -14,7 +14,7 @@ class StoreEnrollmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'transaction_id' => ['nullable', 'exists:transactions,id'],
+            'status' => ['required', 'in:active,completed,expired,cancelled'],
         ];
     }
 }

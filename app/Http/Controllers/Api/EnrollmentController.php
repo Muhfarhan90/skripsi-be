@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Enrollment\StoreEnrollmentRequest;
 use App\Http\Resources\EnrollmentResource;
+use App\Http\Resources\LessonResource;
 use App\Services\EnrollmentService;
 use Illuminate\Http\Request;
 
@@ -34,9 +35,13 @@ class EnrollmentController extends Controller
         ]);
     }
 
-    public function store(StoreEnrollmentRequest $request)
+    public function storeByCourse(StoreEnrollmentRequest $request, string $courseId)
     {
-        $enrollment = $this->service->create((int) $request->user()->id, $request->validated());
+        $enrollment = $this->service->createByCourseId(
+            (int) $request->user()->id,
+            (int) $courseId,
+            $request->validated()
+        );
 
         return response()->json([
             'success' => true,
@@ -56,9 +61,9 @@ class EnrollmentController extends Controller
         ]);
     }
 
-    public function status(Request $request, string $courseId)
+    public function statusByCourse(Request $request, string $courseId)
     {
-        $status = $this->service->enrollmentStatus((int) $request->user()->id, (int) $courseId);
+        $status = $this->service->enrollmentStatusByCourseId((int) $request->user()->id, (int) $courseId);
 
         return response()->json([
             'success' => true,
@@ -75,6 +80,28 @@ class EnrollmentController extends Controller
             'success' => true,
             'message' => 'Enrollment completed successfully',
             'data' => new EnrollmentResource($enrollment),
+        ]);
+    }
+
+    public function progressSummary(Request $request, string $id)
+    {
+        $summary = $this->service->progressSummary((int) $request->user()->id, (int) $id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Enrollment progress summary retrieved successfully',
+            'data' => $summary,
+        ]);
+    }
+
+    public function nextLesson(Request $request, string $id)
+    {
+        $lesson = $this->service->nextLesson((int) $request->user()->id, (int) $id);
+
+        return response()->json([
+            'success' => true,
+            'message' => $lesson ? 'Next lesson retrieved successfully' : 'No next lesson available',
+            'data' => $lesson ? new LessonResource($lesson) : null,
         ]);
     }
 }
