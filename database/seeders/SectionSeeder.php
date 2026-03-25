@@ -18,19 +18,16 @@ class SectionSeeder extends Seeder
                 'course_id' => 1,
                 'title' => 'Getting Started',
                 'sort_order' => 1,
-                'is_locked' => false,
             ],
             [
                 'course_id' => 1,
                 'title' => 'Basic Concepts',
                 'sort_order' => 2,
-                'is_locked' => false,
             ],
             [
                 'course_id' => 2,
                 'title' => 'Advanced Techniques',
                 'sort_order' => 1,
-                'is_locked' => true,
             ],
         ];
 

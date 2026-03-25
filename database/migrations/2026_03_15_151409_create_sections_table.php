@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('course_id')->index();
             $table->string('title');
             $table->integer('sort_order')->default(0);
-            $table->boolean('is_locked')->default(true);
             $table->timestamps();
         });
     }

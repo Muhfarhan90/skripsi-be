@@ -25,6 +25,8 @@ class DatabaseSeeder extends Seeder
             QuestionSeeder::class,
             OptionSeeder::class,
             VoucherSeeder::class,
+            TransactionSeeder::class,
+            EnrollmentSeeder::class,
         ]);
     }
 }

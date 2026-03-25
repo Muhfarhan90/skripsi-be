@@ -14,7 +14,6 @@ class SectionResource extends JsonResource
             'course_id' => $this->course_id,
             'title' => $this->title,
             'sort_order' => $this->sort_order,
-            'is_locked' => $this->is_locked,
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];

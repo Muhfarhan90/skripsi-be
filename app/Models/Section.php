@@ -10,7 +10,6 @@ class Section extends Model
         'course_id',
         'title',
         'sort_order',
-        'is_locked'
     ];
 
     public function course()
@@ -21,5 +20,5 @@ class Section extends Model
     public function lessons()
     {
         return $this->hasMany(Lesson::class, 'section_id');
-    }   
+    }
 }
