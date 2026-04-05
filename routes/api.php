@@ -15,7 +15,9 @@ use App\Http\Controllers\Api\Admin\SectionController;
 use App\Http\Controllers\Api\Admin\TransactionController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VoucherController;
+use App\Http\Controllers\Api\Admin\ForumController as AdminForumController;
 use App\Http\Controllers\Api\EnrollmentController;
+use App\Http\Controllers\Api\ForumController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\LessonProgressController;
 use App\Http\Controllers\Api\QuizAttemptController;
@@ -58,6 +60,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+
+    // Forum (Student) - harus enrolled
+    Route::get('/courses/{courseId}/forum', [ForumController::class, 'index']);
+    Route::post('/courses/{courseId}/forum', [ForumController::class, 'store']);
+    Route::get('/courses/{courseId}/forum/{postId}', [ForumController::class, 'show']);
+    Route::put('/courses/{courseId}/forum/{postId}', [ForumController::class, 'update']);
+    Route::delete('/courses/{courseId}/forum/{postId}', [ForumController::class, 'destroy']);
+    Route::post('/courses/{courseId}/forum/{postId}/replies', [ForumController::class, 'storeReply']);
+    Route::put('/forum-replies/{replyId}', [ForumController::class, 'updateReply']);
+    Route::delete('/forum-replies/{replyId}', [ForumController::class, 'destroyReply']);
 });
 
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
@@ -79,6 +91,17 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('/quizzes/{quizId}/attempts', [AdminQuizAttemptController::class, 'index']);
     Route::get('/quizzes/{quizId}/attempts/{attemptId}', [AdminQuizAttemptController::class, 'show']);
     Route::put('/quizzes/{quizId}/attempts/{attemptId}/answers/{questionId}/grade', [AdminQuizAttemptController::class, 'gradeAnswer']);
+
+    // Forum (Admin & Instructor) - CRUD + moderasi
+    Route::get('/courses/{courseId}/forum', [AdminForumController::class, 'index']);
+    Route::post('/courses/{courseId}/forum', [AdminForumController::class, 'store']);
+    Route::get('/courses/{courseId}/forum/{postId}', [AdminForumController::class, 'show']);
+    Route::put('/courses/{courseId}/forum/{postId}', [AdminForumController::class, 'update']);
+    Route::patch('/courses/{courseId}/forum/{postId}/pin', [AdminForumController::class, 'togglePin']);
+    Route::delete('/courses/{courseId}/forum/{postId}', [AdminForumController::class, 'destroyPost']);
+    Route::post('/courses/{courseId}/forum/{postId}/replies', [AdminForumController::class, 'storeReply']);
+    Route::put('/forum-replies/{replyId}', [AdminForumController::class, 'updateReply']);
+    Route::delete('/forum-replies/{replyId}', [AdminForumController::class, 'destroyReply']);
 });
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware('auth:sanctum');
