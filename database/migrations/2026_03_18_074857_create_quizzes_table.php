@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('quizzes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('course_id')->index();
-            $table->foreignId('section_id')->index();
+            $table->foreignId('course_id')->constrained()->onDelete('cascade');
+            $table->foreignId('section_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->text('description')->nullable();
             $table->integer('duration')->default(0); // in seconds
@@ -24,6 +24,7 @@ return new class extends Migration
             $table->boolean('is_random')->default(false);
             $table->integer('max_attempts')->default(0); // 0 for unlimited
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

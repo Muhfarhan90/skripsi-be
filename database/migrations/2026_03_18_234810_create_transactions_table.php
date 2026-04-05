@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('order_id')->index();
+            $table->foreignId('order_id')->constrained()->onDelete('cascade');
             $table->string('invoice_code')->unique();
             $table->string('external_id')->nullable()->index(); // ID from payment gateway
             $table->string('payment_method')->nullable(); // manual, gateway
@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('status')->default('pending'); // pending, success, failed
             $table->timestamp('paid_at')->nullable();
             $table->timestamp('expired_at')->nullable();
-            $table->foreignId('verified_by')->nullable()->index();
+            $table->foreignId('verified_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
         });
     }

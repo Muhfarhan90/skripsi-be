@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('courses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('category_id')->index();
-            $table->foreignId('instructor_id')->index();
+            $table->foreignId('category_id')->constrained()->onDelete('cascade');
+            $table->foreignId('instructor_id')->constrained('users')->onDelete('cascade');
             $table->string('title');
-            $table->string('slug')->unique();
+            $table->string('slug');
             $table->text('description')->nullable();
             $table->double('price')->default(0);
             $table->double('discount_price')->default(0);
@@ -29,6 +29,8 @@ return new class extends Migration
             $table->double('rating')->default(0);
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['slug', 'deleted_at']);
         });
     }
 

@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('enrollments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id');
-            $table->foreignId('course_id');
-            $table->foreignId('order_id')->nullable()->index();
-            $table->foreignId('last_lesson_id')->nullable();
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('course_id')->constrained()->onDelete('cascade');
+            $table->foreignId('order_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('last_lesson_id')->nullable()->constrained('lessons')->onDelete('set null');
             $table->integer('progress')->default(0);
             $table->string('status')->default('pending'); // pending, active, completed, expired
             $table->timestamp('completed_at')->nullable();
