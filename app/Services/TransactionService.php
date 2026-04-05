@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Transaction;
+use App\Models\Order;
 
 class TransactionService
 {
@@ -18,39 +19,56 @@ class TransactionService
 
     public function create(array $data)
     {
-        // Generate Unique Invoice Number: INV-20260318-7HEX
-        $data['invoice_number'] = $this->generateInvoiceNumber();
+        // Generate Unique Invoice Code
+        $data['invoice_code'] = $this->generateInvoiceCode();
         
-        // Set default values if not provided
-        $data['user_id'] = $data['user_id'] ?? auth()->id();
         $data['status'] = $data['status'] ?? 'pending';
-        $data['expired_at'] = now()->addDay(); // Default 24 hours expiry
+        $data['expired_at'] = $data['expired_at'] ?? now()->addDay();
 
         return Transaction::create($data);
     }
 
-    private function generateInvoiceNumber(): string
+    private function generateInvoiceCode(): string
     {
         $date = now()->format('Ymd');
         $exists = true;
-        $invoice = '';
+        $invoiceCode = '';
 
         while ($exists) {
-            // Generate 7 characters of random HEX
             $randomHex = strtoupper(substr(bin2hex(random_bytes(4)), 0, 7));
-            $invoice = "INV-{$date}-{$randomHex}";
-            
-            // Check if exists to ensure uniqueness
-            $exists = Transaction::where('invoice_number', $invoice)->exists();
+            $invoiceCode = "INV-{$date}-{$randomHex}";
+            $exists = Transaction::where('invoice_code', $invoiceCode)->exists();
         }
 
-        return $invoice;
+        return $invoiceCode;
     }
 
     public function update(int $id, array $data)
     {
         $transaction = $this->findById($id);
+        $oldStatus = $transaction->status;
         $transaction->update($data);
+
+        // If status changed to success (paid), activate order and enrollments
+        if ($oldStatus !== 'success' && $transaction->status === 'success') {
+            $order = $transaction->order;
+            
+            if ($order && $order->status !== 'completed') {
+                $order->update(['status' => 'completed']);
+
+                foreach ($order->enrollments as $enrollment) {
+                    if ($enrollment->status !== 'active') {
+                        $enrollment->update(['status' => 'active']);
+                        $enrollment->course->increment('total_students');
+                    }
+                }
+            }
+
+            // Sync paid_at
+            if (!$transaction->paid_at) {
+                $transaction->update(['paid_at' => now()]);
+            }
+        }
 
         return $transaction;
     }

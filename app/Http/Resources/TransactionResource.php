@@ -11,25 +11,22 @@ class TransactionResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'user_id' => $this->user_id,
-            'course_id' => $this->course_id,
-            'voucher_id' => $this->voucher_id,
-            'invoice_number' => $this->invoice_number,
-            'subtotal' => $this->subtotal,
-            'discount' => $this->discount,
-            'tax' => $this->tax,
-            'admin_fee' => $this->admin_fee,
-            'grand_total' => $this->grand_total,
-            'status' => $this->status,
+            'order_id' => $this->order_id,
+            'transaction_number' => $this->transaction_number,
+            'external_id' => $this->external_id,
             'payment_method' => $this->payment_method,
+            'payment_channel' => $this->payment_channel,
+            'payment_url' => $this->payment_url,
             'payment_reference' => $this->payment_reference,
             'payment_proof' => $this->payment_proof,
-            'notes' => $this->notes,
+            'amount' => $this->amount,
+            'status' => $this->status,
             'paid_at' => $this->paid_at?->format('Y-m-d H:i:s'),
             'expired_at' => $this->expired_at?->format('Y-m-d H:i:s'),
             'verified_by' => $this->verified_by,
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'order' => new OrderResource($this->whenLoaded('order')),
         ];
     }
 }

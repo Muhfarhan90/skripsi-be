@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Enrollment\StoreEnrollmentRequest;
 use App\Http\Resources\EnrollmentResource;
 use App\Http\Resources\LessonResource;
 use App\Services\EnrollmentService;
@@ -35,21 +34,6 @@ class EnrollmentController extends Controller
         ]);
     }
 
-    public function storeByCourse(StoreEnrollmentRequest $request, string $courseId)
-    {
-        $enrollment = $this->service->createByCourseId(
-            (int) $request->user()->id,
-            (int) $courseId,
-            $request->validated()
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Enrollment processed successfully',
-            'data' => new EnrollmentResource($enrollment),
-        ]);
-    }
-
     public function show(Request $request, string $id)
     {
         $enrollment = $this->service->findByIdForUser((int) $request->user()->id, (int) $id);
@@ -58,17 +42,6 @@ class EnrollmentController extends Controller
             'success' => true,
             'message' => 'Enrollment retrieved successfully',
             'data' => new EnrollmentResource($enrollment),
-        ]);
-    }
-
-    public function statusByCourse(Request $request, string $courseId)
-    {
-        $status = $this->service->enrollmentStatusByCourseId((int) $request->user()->id, (int) $courseId);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Enrollment status retrieved successfully',
-            'data' => $status,
         ]);
     }
 

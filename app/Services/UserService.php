@@ -9,12 +9,12 @@ class UserService
 {
     public function getAll()
     {
-        return User::with('role')->latest()->paginate(10);
+        return User::with('role')->withCount('orders')->latest()->paginate(10);
     }
 
     public function findById(int $id)
     {
-        return User::with('role')->findOrFail($id);
+        return User::with(['role', 'orders.transactions', 'enrollments.course'])->findOrFail($id);
     }
 
     public function create(array $data)

@@ -13,20 +13,16 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->index();
-            $table->foreignId('course_id')->index();
-            $table->foreignId('voucher_id')->nullable()->index();
-            $table->string('invoice_number')->unique();
-            $table->decimal('subtotal', 10, 2);
-            $table->decimal('discount', 10, 2)->default(0);
-            $table->decimal('tax', 10, 2)->default(0);
-            $table->decimal('admin_fee', 10, 2)->default(0);
-            $table->decimal('grand_total', 10, 2);
-            $table->string('status')->default('pending');
-            $table->string('payment_method')->nullable();
-            $table->string('payment_reference')->nullable();
-            $table->string('payment_proof')->nullable();
-            $table->text('notes')->nullable();
+            $table->foreignId('order_id')->index();
+            $table->string('invoice_code')->unique();
+            $table->string('external_id')->nullable()->index(); // ID from payment gateway
+            $table->string('payment_method')->nullable(); // manual, gateway
+            $table->string('payment_channel')->nullable(); // e.g. bca_va, alfamart
+            $table->string('payment_url')->nullable(); // for snap/checkout link
+            $table->string('payment_reference')->nullable(); // Reference from manual bank transfer
+            $table->string('payment_proof')->nullable(); // Path to proof image
+            $table->decimal('amount', 10, 2);
+            $table->string('status')->default('pending'); // pending, success, failed
             $table->timestamp('paid_at')->nullable();
             $table->timestamp('expired_at')->nullable();
             $table->foreignId('verified_by')->nullable()->index();

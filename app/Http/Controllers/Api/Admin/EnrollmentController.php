@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\Enrollment\StoreEnrollmentRequest;
 use App\Http\Requests\Admin\Enrollment\UpdateEnrollmentStatusRequest;
 use App\Http\Resources\EnrollmentResource;
 use App\Services\EnrollmentService;
@@ -59,18 +58,6 @@ class EnrollmentController extends Controller
                 'per_page' => $enrollments->perPage(),
                 'total' => $enrollments->total(),
             ],
-        ]);
-    }
-
-    public function storeByCourse(StoreEnrollmentRequest $request, string $courseId)
-    {
-        $payload = $request->validated();
-        $enrollment = $this->service->createByCourseId((int) $payload['user_id'], (int) $courseId, $payload);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Enrollment created successfully',
-            'data' => new EnrollmentResource($enrollment),
         ]);
     }
 

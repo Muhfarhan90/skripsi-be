@@ -7,20 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 class Transaction extends Model
 {
     protected $fillable = [
-        'user_id',
-        'course_id',
-        'voucher_id',
-        'invoice_number',
-        'subtotal',
-        'discount',
-        'tax',
-        'admin_fee',
-        'grand_total',
-        'status',
+        'order_id',
+        'invoice_code',
+        'external_id',
         'payment_method',
+        'payment_channel',
+        'payment_url',
         'payment_reference',
         'payment_proof',
-        'notes',
+        'amount',
+        'status',
         'paid_at',
         'expired_at',
         'verified_by'
@@ -31,20 +27,9 @@ class Transaction extends Model
         'expired_at' => 'datetime',
     ];
 
-    public function user()
+    public function order()
     {
-        return $this->belongsTo(User::class, 'user_id');
-    }
-
-    public function voucher()
-    {
-        return $this->belongsTo(Voucher::class, 'voucher_id');
-    }
-
-
-    public function course()
-    {
-        return $this->belongsTo(Course::class, 'course_id');
+        return $this->belongsTo(Order::class, 'order_id');
     }
 
     public function verifier()

@@ -6,12 +6,20 @@ use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Lesson;
 use App\Models\LessonProgress;
-use App\Models\Transaction;
+use App\Models\Order;
+use App\Models\Voucher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class EnrollmentService
 {
+    protected OrderService $orderService;
+
+    public function __construct(OrderService $orderService)
+    {
+        $this->orderService = $orderService;
+    }
+
     public function getAllByUser(int $userId)
     {
         return Enrollment::where('user_id', $userId)
@@ -23,102 +31,6 @@ class EnrollmentService
     {
         return Enrollment::where('user_id', $userId)
             ->findOrFail($id);
-    }
-
-    public function enrollmentStatusByCourseId(int $userId, int $courseId): array
-    {
-        $course = Course::findOrFail($courseId);
-
-        $enrollment = Enrollment::where('user_id', $userId)
-            ->where('course_id', $course->id)
-            ->first();
-
-        if (! $enrollment) {
-            return [
-                'is_enrolled' => false,
-                'status' => 'not_enrolled',
-                'progress' => 0,
-            ];
-        }
-
-        return [
-            'is_enrolled' => true,
-            'enrollment_id' => $enrollment->id,
-            'status' => $enrollment->status,
-            'progress' => $enrollment->progress,
-            'last_lesson_id' => $enrollment->last_lesson_id,
-            'completed_at' => $enrollment->completed_at?->format('Y-m-d H:i:s'),
-        ];
-    }
-
-    public function createByCourseId(int $userId, int $courseId, array $data): Enrollment
-    {
-        $course = Course::findOrFail($courseId);
-        $transactionId = isset($data['transaction_id']) ? (int) $data['transaction_id'] : null;
-
-        if ($course->status !== 'published') {
-            throw ValidationException::withMessages([
-                'course_id' => ['Course is not available for enrollment'],
-            ]);
-        }
-
-        $existing = Enrollment::where('user_id', $userId)
-            ->where('course_id', $course->id)
-            ->first();
-
-        if ($existing) {
-            throw ValidationException::withMessages([
-                'course_id' => ['User is already enrolled in this course'],
-            ]);
-        }
-
-        $price = (float) ($course->discount_price > 0 ? $course->discount_price : $course->price);
-        $requiresPayment = $price > 0;
-
-        $transaction = null;
-        if ($requiresPayment) {
-            if (! $transactionId) {
-                throw ValidationException::withMessages([
-                    'transaction_id' => ['Paid course requires a valid transaction'],
-                ]);
-            }
-
-            $transaction = Transaction::where('id', $transactionId)
-                ->where('user_id', $userId)
-                ->where('course_id', $course->id)
-                ->first();
-
-            if (! $transaction || $transaction->status !== 'paid') {
-                throw ValidationException::withMessages([
-                    'transaction_id' => ['Transaction is invalid or not paid'],
-                ]);
-            }
-        } elseif ($transactionId) {
-            $transaction = Transaction::where('id', $transactionId)
-                ->where('user_id', $userId)
-                ->where('course_id', $course->id)
-                ->first();
-
-            if (! $transaction) {
-                throw ValidationException::withMessages([
-                    'transaction_id' => ['Transaction is invalid for this course'],
-                ]);
-            }
-        }
-
-        return DB::transaction(function () use ($userId, $course, $transaction) {
-            $enrollment = Enrollment::create([
-                'user_id' => $userId,
-                'course_id' => $course->id,
-                'transaction_id' => $transaction?->id,
-                'progress' => 0,
-                'status' => 'active',
-            ]);
-
-            $course->increment('total_students');
-
-            return $enrollment;
-        });
     }
 
     public function complete(int $userId, int $id): Enrollment

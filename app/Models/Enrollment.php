@@ -9,7 +9,7 @@ class Enrollment extends Model
     protected $fillable = [
         'user_id',
         'course_id',
-        'transaction_id',
+        'order_id',
         'last_lesson_id',
         'progress',
         'status',
@@ -32,9 +32,9 @@ class Enrollment extends Model
         return $this->belongsTo(Course::class);
     }
 
-    public function transaction()
+    public function order()
     {
-        return $this->belongsTo(Transaction::class);
+        return $this->belongsTo(Order::class);
     }
 
     public function lastLesson()
