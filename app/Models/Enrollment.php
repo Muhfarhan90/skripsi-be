@@ -51,4 +51,14 @@ class Enrollment extends Model
     {
         return $this->hasMany(QuizAttempt::class);
     }
+
+    public function review()
+    {
+        return $this->hasOne(Review::class);
+    }
+
+    public function certificate()
+    {
+        return $this->hasOne(Certificate::class);
+    }
 }

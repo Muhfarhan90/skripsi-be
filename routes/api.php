@@ -16,8 +16,11 @@ use App\Http\Controllers\Api\Admin\TransactionController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VoucherController;
 use App\Http\Controllers\Api\Admin\ForumController as AdminForumController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\ForumController;
+use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\LessonProgressController;
 use App\Http\Controllers\Api\QuizAttemptController;
@@ -70,6 +73,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/courses/{courseId}/forum/{postId}/replies', [ForumController::class, 'storeReply']);
     Route::put('/forum-replies/{replyId}', [ForumController::class, 'updateReply']);
     Route::delete('/forum-replies/{replyId}', [ForumController::class, 'destroyReply']);
+
+    // Reviews
+    Route::get('/courses/{courseId}/reviews', [ReviewController::class, 'index']);
+    Route::post('/courses/{courseId}/reviews', [ReviewController::class, 'store']);
+    Route::put('/courses/{courseId}/reviews/{reviewId}', [ReviewController::class, 'update']);
+    Route::delete('/courses/{courseId}/reviews/{reviewId}', [ReviewController::class, 'destroy']);
+
+    // Certificates
+    Route::get('/certificates', [CertificateController::class, 'index']);
+    Route::get('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'show']);
+    Route::post('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'generate']);
 });
 
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
@@ -102,6 +116,9 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::post('/courses/{courseId}/forum/{postId}/replies', [AdminForumController::class, 'storeReply']);
     Route::put('/forum-replies/{replyId}', [AdminForumController::class, 'updateReply']);
     Route::delete('/forum-replies/{replyId}', [AdminForumController::class, 'destroyReply']);
+
+    // Reviews (Admin & Instructor) - Moderasi menghapus review
+    Route::delete('/courses/{courseId}/reviews/{reviewId}', [AdminReviewController::class, 'destroy']);
 });
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware('auth:sanctum');
