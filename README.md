@@ -196,7 +196,35 @@ Untuk melihat daftar route aktual dari kode:
 php artisan route:list --path=api --except-vendor
 ```
 
-## 8. Format Response API
+## 8. Swagger API Docs UI
+
+Dokumentasi Swagger sekarang sudah tersedia.
+
+- UI: `http://127.0.0.1:8000/api/docs`
+- OpenAPI spec: `docs/openapi.yaml`
+- Raw spec URL dari app: `http://127.0.0.1:8000/api/openapi.yaml`
+
+Langkah pakai:
+
+1. Jalankan server:
+
+```bash
+php artisan serve
+```
+
+2. Login lewat endpoint `/api/auth/login` untuk dapat token.
+
+3. Di Swagger UI, klik tombol **Authorize**, lalu isi:
+
+```text
+Bearer <token_anda>
+```
+
+Catatan:
+- Dokumen Swagger saat ini fokus pada endpoint inti (Auth, Student flow utama, dan Admin flow utama).
+- Endpoint lain bisa ditambahkan dengan pola yang sama langsung di `docs/openapi.yaml`.
+
+## 9. Format Response API
 
 ### Sukses
 
@@ -229,47 +257,47 @@ Contoh umum:
 }
 ```
 
-## 9. Alur Bisnis Penting
+## 10. Alur Bisnis Penting
 
-### 9.1 Register -> Verify Email -> Login
+### 10.1 Register -> Verify Email -> Login
 
 - user register via `AuthService`
 - sistem kirim email verifikasi (`VerifyApiEmail`, queued)
 - user verifikasi via signed URL
 - login berhasil jika akun aktif dan email sudah verified
 
-### 9.2 Order -> Transaction -> Enrollment
+### 10.2 Order -> Transaction -> Enrollment
 
 - user membuat order (dengan validasi duplikasi course aktif/pending)
 - sistem hitung subtotal, voucher, grand total
 - sistem buat transaction awal
 - saat order/transaction menjadi sukses, enrollment diaktifkan
 
-### 9.3 Lesson Progress -> Enrollment Progress
+### 10.3 Lesson Progress -> Enrollment Progress
 
 - update progress lesson lewat `LessonProgressService`
 - service otomatis sync progress enrollment
 - enrollment bisa ditandai completed saat progress 100%
 
-### 9.4 Quiz Attempt
+### 10.4 Quiz Attempt
 
 - user mulai attempt jika belum melebihi `max_attempts`
 - jawaban pilihan ganda auto-score
 - jawaban essay/short answer perlu manual grading admin
 - status attempt: `in_progress` -> `submitted`/`graded`
 
-### 9.5 Certificate
+### 10.5 Certificate
 
 - certificate hanya bisa digenerate jika enrollment `completed`
 - jika sudah pernah generate, akan return data sertifikat yang sudah ada
 
-### 9.6 Forum & Review
+### 10.6 Forum & Review
 
 - forum student mensyaratkan enrollment aktif/completed
 - review mensyaratkan enrollment completed
 - moderasi admin/instructor diverifikasi di service sesuai role/course ownership
 
-## 10. Konvensi Koding di Proyek Ini
+## 11. Konvensi Koding di Proyek Ini
 
 Konvensi yang sebaiknya diikuti agar konsisten:
 
@@ -305,7 +333,7 @@ Command ini membuat stub:
 - resource
 - test
 
-## 11. Checklist Cepat untuk Junior Dev / AI Murah
+## 12. Checklist Cepat untuk Junior Dev / AI Murah
 
 Sebelum mengubah kode, baca dulu file ini berurutan:
 
@@ -326,7 +354,7 @@ Sebelum edit, baca dulu file: routes/api.php, controller X, service X, request X
 Jika menambah endpoint, sertakan juga validasi request + resource + contoh response.
 ```
 
-## 12. Perintah Harian yang Sering Dipakai
+## 13. Perintah Harian yang Sering Dipakai
 
 ```bash
 # Jalankan test
@@ -342,8 +370,8 @@ php artisan migrate:status
 php artisan db:seed
 ```
 
-## 13. Catatan Penting
+## 14. Catatan Penting
 
-- Folder `docs/` saat ini kosong, jadi README ini adalah dokumentasi utama proyek.
+- Dokumentasi OpenAPI ada di `docs/openapi.yaml`.
 - Otorisasi route admin saat ini berbasis middleware `auth:sanctum`; validasi role detail ada di beberapa service (contoh `ForumService`, `ReviewService`).
 - Jika mau production-ready penuh, lanjutkan dengan policy/gate yang konsisten di seluruh endpoint admin.
