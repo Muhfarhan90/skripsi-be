@@ -40,8 +40,12 @@ class VerifyApiEmail extends Notification implements ShouldQueue
     protected function buildActionUrl(): string
     {
         if ($this->frontendUrl) {
-            // front-end link can include the signed API URL as a query param
-            return rtrim($this->frontendUrl, '/') . '/?verify_url=' . urlencode($this->verificationUrl);
+            $frontend = rtrim($this->frontendUrl, '/');
+            $frontendPath = parse_url($frontend, PHP_URL_PATH) ?: '';
+            $verifyPath = str_contains($frontendPath, '/verify-email') ? '' : '/verify-email';
+
+            // Front-end link includes the signed API URL as query param for FE-driven verify flow.
+            return $frontend . $verifyPath . '?verify_url=' . urlencode($this->verificationUrl);
         }
 
         return $this->verificationUrl;

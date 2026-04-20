@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use App\Notifications\VerifyApiEmail;
+use App\Notifications\ResetApiPassword;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -51,7 +52,7 @@ class AuthService
             if (config('app.env') === 'local' || config('app.debug')) {
                 $response['verification_url'] = $signedUrl;
                 if ($frontend) {
-                    $response['frontend_verification_url'] = rtrim($frontend, '/') . '/?verify_url=' . urlencode($signedUrl);
+                    $response['frontend_verification_url'] = $this->buildFrontendVerificationUrl($frontend, $signedUrl);
                 }
             }
 
@@ -180,18 +181,31 @@ class AuthService
         if (config('app.env') === 'local' || config('app.debug')) {
             $response['verification_url'] = $signedUrl;
             if ($frontend) {
-                $response['frontend_verification_url'] = rtrim($frontend, '/') . '/?verify_url=' . urlencode($signedUrl);
+                $response['frontend_verification_url'] = $this->buildFrontendVerificationUrl($frontend, $signedUrl);
             }
         }
 
         return $response;
     }
 
+    private function buildFrontendVerificationUrl(string $frontendUrl, string $signedUrl): string
+    {
+        $frontend = rtrim($frontendUrl, '/');
+        $frontendPath = parse_url($frontend, PHP_URL_PATH) ?: '';
+        $verifyPath = str_contains($frontendPath, '/verify-email') ? '' : '/verify-email';
+
+        return $frontend . $verifyPath . '?verify_url=' . urlencode($signedUrl);
+    }
+
     public function forgotPassword($email)
     {
+        // Keep reset-link generation/throttling in Laravel broker,
+        // but send the API-first reset email from service instead of model.
         $status = Password::sendResetLink([
             'email' => $email,
-        ]);
+        ], function (User $user, string $token): void {
+            $user->notify(new ResetApiPassword($token));
+        });
 
         if ($status !== Password::RESET_LINK_SENT) {
             throw ValidationException::withMessages([
@@ -259,3 +273,5 @@ class AuthService
         ];
     }
 }
+
+

@@ -13,6 +13,7 @@ use App\Services\AuthService;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -65,17 +66,18 @@ class AuthController extends Controller
     {
         // validate signed URL
         if (! URL::hasValidSignature($request)) {
-            return response()->json(['success' => false, 'message' => 'Invalid or expired verification link'], 400);
+            return $this->verificationResponse($request, false, 'Invalid or expired verification link', 400);
         }
 
         $user = User::findOrFail($id);
 
-        $result = $this->authService->verifyEmail($user);
-
-        return response()->json([
-            'success' => true,
-            'message' => $result['message'],
-        ]);
+        try {
+            $result = $this->authService->verifyEmail($user);
+            return $this->verificationResponse($request, true, $result['message']);
+        } catch (ValidationException $exception) {
+            $message = $exception->validator->errors()->first() ?: 'Email verification failed';
+            return $this->verificationResponse($request, false, $message, 422);
+        }
     }
 
     public function resendVerificationEmail(ResendVerificationEmailRequest $request)
@@ -108,5 +110,24 @@ class AuthController extends Controller
             'success' => true,
             'message' => $result['message'],
         ]);
+    }
+
+    private function verificationResponse(Request $request, bool $success, string $message, int $status = 200)
+    {
+        // Keep JSON contract for FE/API calls, but redirect browser clicks to FE success/error page.
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => $success,
+                'message' => $message,
+            ], $status);
+        }
+
+        $frontendBaseUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        $query = http_build_query([
+            'status' => $success ? 'success' : 'error',
+            'message' => $message,
+        ]);
+
+        return redirect()->away($frontendBaseUrl . '/verify-email?' . $query);
     }
 }
