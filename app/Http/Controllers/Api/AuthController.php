@@ -122,7 +122,7 @@ class AuthController extends Controller
             ], $status);
         }
 
-        $frontendBaseUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        $frontendBaseUrl = rtrim((string) (config('app.frontend_url') ?: config('app.url')), '/');
         $query = http_build_query([
             'status' => $success ? 'success' : 'error',
             'message' => $message,

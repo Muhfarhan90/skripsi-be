@@ -33,7 +33,7 @@ class ResetApiPassword extends Notification implements ShouldQueue
 
     private function buildActionUrl(string $email): string
     {
-        $frontendUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        $frontendUrl = rtrim((string) (config('app.frontend_url') ?: config('app.url')), '/');
 
         return $frontendUrl
             . '/reset-password?token=' . urlencode($this->token)

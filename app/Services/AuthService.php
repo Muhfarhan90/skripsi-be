@@ -39,7 +39,7 @@ class AuthService
             );
 
             // optional frontend URL (if you want the link to point to frontend)
-            $frontend = env('FRONTEND_URL');
+            $frontend = config('app.frontend_url');
 
             $response = [
                 'user' => $user,
@@ -164,7 +164,7 @@ class AuthService
             ]
         );
 
-        $frontend = env('FRONTEND_URL');
+        $frontend = config('app.frontend_url');
         try {
             $user->notify(new VerifyApiEmail($signedUrl, $frontend ?: null));
             $notificationStatus = 'queued';
