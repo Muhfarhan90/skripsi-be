@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Course\StoreCourseRequest;
+use App\Http\Requests\Admin\Course\UpsertCourseCurriculumRequest;
 use App\Http\Requests\Admin\Course\UpdateCourseRequest;
+use App\Http\Resources\CourseCurriculumResource;
 use App\Http\Resources\CourseResource;
 use App\Services\CourseService;
 use Illuminate\Http\Request;
@@ -64,6 +66,17 @@ class CourseController extends Controller
         ]);
     }
 
+    public function curriculum(string $courseId)
+    {
+        $course = $this->service->findByIdWithCurriculum((int) $courseId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Course curriculum retrieved successfully',
+            'data' => new CourseCurriculumResource($course),
+        ]);
+    }
+
     /**
      * Update the specified resource in storage.
      */
@@ -75,6 +88,17 @@ class CourseController extends Controller
             'success' => true,
             'message' => 'Course updated successfully',
             'data' => new CourseResource($course),
+        ]);
+    }
+
+    public function upsertCurriculum(UpsertCourseCurriculumRequest $request, string $courseId)
+    {
+        $course = $this->service->upsertCurriculum((int) $courseId, $request->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Course curriculum updated successfully',
+            'data' => new CourseCurriculumResource($course),
         ]);
     }
 

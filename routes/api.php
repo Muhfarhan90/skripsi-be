@@ -59,7 +59,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts/{attemptId}', [QuizAttemptController::class, 'show']);
     Route::put('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts/{attemptId}/answers/{questionId}', [QuizAttemptController::class, 'upsertAnswer']);
     Route::post('/enrollments/{enrollmentId}/quizzes/{quizId}/attempts/{attemptId}/submit', [QuizAttemptController::class, 'submit']);
-    
+
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
@@ -87,6 +87,8 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
+    Route::get('/courses/{courseId}/curriculum', [CourseController::class, 'curriculum']);
+    Route::put('/courses/{courseId}/curriculum', [CourseController::class, 'upsertCurriculum']);
     Route::get('/enrollments', [AdminEnrollmentController::class, 'index']);
     Route::get('/orders', [AdminOrderController::class, 'index']);
     Route::post('/orders', [AdminOrderController::class, 'store']);
