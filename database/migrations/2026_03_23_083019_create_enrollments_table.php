@@ -17,8 +17,8 @@ return new class extends Migration
             $table->foreignId('course_id')->constrained()->onDelete('cascade');
             $table->foreignId('order_id')->nullable()->constrained()->onDelete('set null');
             $table->foreignId('last_lesson_id')->nullable()->constrained('lessons')->onDelete('set null');
-            $table->integer('progress')->default(0);
-            $table->string('status')->default('pending'); // pending, active, completed, expired
+            $table->integer('progress')->nullable()->default(0);
+            $table->string('status')->nullable()->default('pending'); // pending, active, completed, expired
             $table->timestamp('completed_at')->nullable();
             $table->timestamp('expired_at')->nullable();
             $table->timestamps();

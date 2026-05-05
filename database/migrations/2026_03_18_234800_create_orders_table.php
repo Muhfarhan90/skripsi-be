@@ -17,11 +17,11 @@ return new class extends Migration
             $table->foreignId('voucher_id')->nullable()->constrained()->onDelete('set null');
             $table->string('order_code')->unique();
             $table->decimal('subtotal', 10, 2);
-            $table->decimal('discount', 10, 2)->default(0);
-            $table->decimal('tax', 10, 2)->default(0);
-            $table->decimal('admin_fee', 10, 2)->default(0);
+            $table->decimal('discount', 10, 2)->nullable()->default(0);
+            $table->decimal('tax', 10, 2)->nullable()->default(0);
+            $table->decimal('admin_fee', 10, 2)->nullable()->default(0);
             $table->decimal('grand_total', 10, 2);
-            $table->string('status')->default('pending'); // pending, completed, cancelled
+            $table->string('status')->nullable()->default('pending'); // pending, completed, cancelled
             $table->timestamps();
         });
     }

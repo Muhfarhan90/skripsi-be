@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('enrollment_id')->index();
             $table->foreignId('quiz_id')->index();
-            $table->integer('total_score')->default(0);
-            $table->string('status')->default('in_progress');
+            $table->integer('total_score')->nullable()->default(0);
+            $table->string('status')->nullable()->default('in_progress');
             $table->timestamp('started_at')->nullable();
             $table->timestamp('submitted_at')->nullable();
             $table->timestamps();

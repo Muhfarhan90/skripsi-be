@@ -30,6 +30,9 @@ class CourseService
             'sections.lessons' => function ($query) {
                 $query->orderBy('sort_order')->orderBy('id');
             },
+            'sections.quizzes' => function ($query) {
+                $query->orderByDesc('id');
+            },
         ])->findOrFail($id);
     }
 

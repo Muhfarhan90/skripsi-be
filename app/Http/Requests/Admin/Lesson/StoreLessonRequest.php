@@ -18,7 +18,7 @@ class StoreLessonRequest extends FormRequest
             'section_id' => ['required', 'exists:sections,id'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'type' => ['required', 'in:video,file,quiz'],
+            'type' => ['required', 'in:video,file'],
             'lesson_url' => ['nullable', 'url'],
             'duration' => ['nullable', 'integer'],
             'sort_order' => ['nullable', 'integer'],

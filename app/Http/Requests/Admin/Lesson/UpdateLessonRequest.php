@@ -18,7 +18,7 @@ use Illuminate\Foundation\Http\FormRequest;
             'section_id' => ['sometimes', 'exists:sections,id'],
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'type' => ['sometimes', 'in:video,file,quiz'],
+            'type' => ['sometimes', 'in:video,file'],
             'lesson_url' => ['nullable', 'url'],
             'duration' => ['nullable', 'integer'],
             'sort_order' => ['nullable', 'integer'],

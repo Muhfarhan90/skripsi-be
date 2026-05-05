@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('payment_reference')->nullable(); // Reference from manual bank transfer
             $table->string('payment_proof')->nullable(); // Path to proof image
             $table->decimal('amount', 10, 2);
-            $table->string('status')->default('pending'); // pending, success, failed
+            $table->string('status')->nullable()->default('pending'); // pending, success, failed
             $table->timestamp('paid_at')->nullable();
             $table->timestamp('expired_at')->nullable();
             $table->foreignId('verified_by')->nullable()->constrained('users')->onDelete('set null');

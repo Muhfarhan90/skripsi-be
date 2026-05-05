@@ -17,9 +17,9 @@ return new class extends Migration
             $table->text('question_text');
             $table->string('image_url')->nullable();
             $table->string('type')->nullable(); // e.g., 'multiple_choice', 'true_false', etc.
-            $table->integer('score')->default(0);
-            $table->integer('sort_order')->default(0);
-            $table->boolean('is_active')->default(true);
+            $table->integer('score')->nullable()->default(0);
+            $table->integer('sort_order')->nullable()->default(0);
+            $table->boolean('is_active')->nullable()->default(true);
             $table->timestamps();
             $table->softDeletes();  
         });

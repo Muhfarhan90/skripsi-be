@@ -18,6 +18,7 @@ class Quiz extends Model
         'passing_score',
         'weight',
         'is_active',
+        'is_random',
         'max_attempts'
     ];
 

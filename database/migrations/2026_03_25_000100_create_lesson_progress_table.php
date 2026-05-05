@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('enrollment_id')->index();
             $table->foreignId('lesson_id')->index();
-            $table->integer('progress_seconds')->default(0);
+            $table->integer('progress_seconds')->nullable()->default(0);
             $table->timestamp('last_accessed_at')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();

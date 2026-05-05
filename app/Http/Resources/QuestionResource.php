@@ -18,6 +18,7 @@ class QuestionResource extends JsonResource
             'score' => $this->score,
             'sort_order' => $this->sort_order,
             'is_active' => $this->is_active,
+            'options' => OptionResource::collection($this->whenLoaded('options')),
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];

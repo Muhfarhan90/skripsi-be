@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->text('content');
-            $table->boolean('is_pinned')->default(false);
+            $table->boolean('is_pinned')->nullable()->default(false);
             $table->timestamps();
             $table->softDeletes();
         });

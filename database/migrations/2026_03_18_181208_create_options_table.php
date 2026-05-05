@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('question_id')->index();
             $table->string('option_text');
             $table->string('image_url')->nullable();
-            $table->boolean('is_correct')->default(false);
+            $table->boolean('is_correct')->nullable()->default(false);
             $table->timestamps();
         });
     }

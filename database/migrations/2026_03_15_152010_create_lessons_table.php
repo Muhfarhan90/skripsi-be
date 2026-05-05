@@ -18,9 +18,9 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('type')->nullable(); // e.g., video, pdf, docs
             $table->string('lesson_url')->nullable();
-            $table->integer('duration')->default(0); // in seconds
-            $table->integer('sort_order')->default(0);
-            $table->boolean('is_preview')->default(false);
+            $table->integer('duration')->nullable()->default(0); // in seconds
+            $table->integer('sort_order')->nullable()->default(0);
+            $table->boolean('is_preview')->nullable()->default(false);
             $table->timestamps();
         });
     }

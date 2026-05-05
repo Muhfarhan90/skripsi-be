@@ -89,6 +89,19 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::get('/courses/{courseId}/curriculum', [CourseController::class, 'curriculum']);
     Route::put('/courses/{courseId}/curriculum', [CourseController::class, 'upsertCurriculum']);
+    Route::get('/courses/{courseId}/quizzes', [QuizController::class, 'indexByCourse']);
+    Route::post('/courses/{courseId}/sections/{sectionId}/quizzes', [QuizController::class, 'storeForSection']);
+    Route::put('/courses/{courseId}/sections/{sectionId}/quizzes/{quizId}', [QuizController::class, 'updateForSection']);
+
+    Route::post('/quizzes/{quizId}/questions', [QuestionController::class, 'storeForQuiz']);
+    Route::put('/quizzes/{quizId}/questions/reorder', [QuestionController::class, 'reorderForQuiz']);
+    Route::put('/quizzes/{quizId}/questions/{questionId}', [QuestionController::class, 'updateForQuiz']);
+    Route::delete('/quizzes/{quizId}/questions/{questionId}', [QuestionController::class, 'destroyForQuiz']);
+
+    Route::post('/questions/{questionId}/options', [OptionController::class, 'storeForQuestion']);
+    Route::put('/questions/{questionId}/options/{optionId}', [OptionController::class, 'updateForQuestion']);
+    Route::delete('/questions/{questionId}/options/{optionId}', [OptionController::class, 'destroyForQuestion']);
+
     Route::get('/enrollments', [AdminEnrollmentController::class, 'index']);
     Route::get('/orders', [AdminOrderController::class, 'index']);
     Route::post('/orders', [AdminOrderController::class, 'store']);

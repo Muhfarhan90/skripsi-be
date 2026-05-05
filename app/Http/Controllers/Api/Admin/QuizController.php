@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\Quiz\StoreQuizRequest;
 use App\Http\Requests\Admin\Quiz\UpdateQuizRequest;
 use App\Http\Resources\QuizResource;
 use App\Services\QuizService;
+use Illuminate\Http\Request;
 
 class QuizController extends Controller
 {
@@ -45,9 +46,69 @@ class QuizController extends Controller
         ]);
     }
 
+    public function indexByCourse(string $courseId)
+    {
+        $quiz = $this->service->getByCourse((int) $courseId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Course quiz list retrieved successfully',
+            'data' => QuizResource::collection($quiz),
+        ]);
+    }
+
+    public function storeForSection(Request $request, string $courseId, string $sectionId)
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'duration' => ['nullable', 'integer', 'min:0'],
+            'passing_score' => ['nullable', 'integer', 'min:0'],
+            'weight' => ['nullable', 'integer', 'min:0'],
+            'is_active' => ['nullable', 'boolean'],
+            'is_random' => ['nullable', 'boolean'],
+            'max_attempts' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $quiz = $this->service->createForCourseSection((int) $courseId, (int) $sectionId, $validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quiz created successfully',
+            'data' => new QuizResource($quiz),
+        ]);
+    }
+
+    public function updateForSection(Request $request, string $courseId, string $sectionId, string $quizId)
+    {
+        $validated = $request->validate([
+            'title' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'duration' => ['nullable', 'integer', 'min:0'],
+            'passing_score' => ['nullable', 'integer', 'min:0'],
+            'weight' => ['nullable', 'integer', 'min:0'],
+            'is_active' => ['nullable', 'boolean'],
+            'is_random' => ['nullable', 'boolean'],
+            'max_attempts' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $quiz = $this->service->updateForCourseSection(
+            (int) $courseId,
+            (int) $sectionId,
+            (int) $quizId,
+            $validated,
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quiz updated successfully',
+            'data' => new QuizResource($quiz),
+        ]);
+    }
+
     public function show(string $id)
     {
-        $quiz = $this->service->findById((int) $id);
+        $quiz = $this->service->findByIdWithDetails((int) $id);
 
         return response()->json([
             'success' => true,

@@ -19,7 +19,7 @@ return new class extends Migration
             $table->decimal('min_purchase', 8, 2)->nullable();
             $table->decimal('max_discount', 8, 2)->nullable();
             $table->integer('usage_limit')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('is_active')->nullable()->default(true);
             $table->timestamp('expired_at')->nullable();
             $table->timestamps();
         });

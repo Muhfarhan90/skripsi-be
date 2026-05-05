@@ -17,12 +17,12 @@ return new class extends Migration
             $table->foreignId('section_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->text('description')->nullable();
-            $table->integer('duration')->default(0); // in seconds
-            $table->integer('passing_score')->default(0);
-            $table->integer('weight')->default(0);
-            $table->boolean('is_active')->default(true);
-            $table->boolean('is_random')->default(false);
-            $table->integer('max_attempts')->default(0); // 0 for unlimited
+            $table->integer('duration')->nullable()->default(0); // in seconds
+            $table->integer('passing_score')->nullable()->default(0);
+            $table->integer('weight')->nullable()->default(0);
+            $table->boolean('is_active')->nullable()->default(true);
+            $table->boolean('is_random')->nullable()->default(false);
+            $table->integer('max_attempts')->nullable()->default(0); // 0 for unlimited
             $table->timestamps();
             $table->softDeletes();
         });

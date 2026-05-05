@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('selected_option_id')->nullable()->index();
             $table->text('answer_text')->nullable();
             $table->boolean('is_correct')->nullable();
-            $table->integer('score')->default(0);
+            $table->integer('score')->nullable()->default(0);
             $table->timestamps();
 
             $table->unique(['attempt_id', 'question_id']);

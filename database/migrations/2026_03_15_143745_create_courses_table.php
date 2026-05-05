@@ -18,15 +18,15 @@ return new class extends Migration
             $table->string('title');
             $table->string('slug');
             $table->text('description')->nullable();
-            $table->double('price')->default(0);
-            $table->double('discount_price')->default(0);
+            $table->double('price')->nullable();
+            $table->double('discount_price')->nullable();
             $table->string('thumbnail')->nullable();
-            $table->string('status')->default('draft');
-            $table->integer('total_duration')->default(0); // in seconds
+            $table->string('status')->nullable()->default('draft');
+            $table->integer('total_duration')->nullable()->default(0); // in seconds
             $table->text('requirements')->nullable();
             $table->text('outcomes')->nullable();
-            $table->integer('total_students')->default(0);
-            $table->double('rating')->default(0);
+            $table->integer('total_students')->nullable()->default(0);
+            $table->double('rating')->nullable()->default(0);
             $table->timestamps();
             $table->softDeletes();
 

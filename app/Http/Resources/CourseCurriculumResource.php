@@ -50,6 +50,26 @@ class CourseCurriculumResource extends JsonResource
                                     'is_preview' => $lesson->is_preview,
                                 ];
                             }),
+                        'quizzes' => $section->quizzes
+                            ->sortByDesc('id')
+                            ->values()
+                            ->map(function ($quiz) {
+                                return [
+                                    'id' => $quiz->id,
+                                    'course_id' => $quiz->course_id,
+                                    'section_id' => $quiz->section_id,
+                                    'title' => $quiz->title,
+                                    'description' => $quiz->description,
+                                    'duration' => $quiz->duration,
+                                    'passing_score' => $quiz->passing_score,
+                                    'weight' => $quiz->weight,
+                                    'is_active' => $quiz->is_active,
+                                    'is_random' => $quiz->is_random,
+                                    'max_attempts' => $quiz->max_attempts,
+                                    'created_at' => $quiz->created_at?->format('Y-m-d H:i:s'),
+                                    'updated_at' => $quiz->updated_at?->format('Y-m-d H:i:s'),
+                                ];
+                            }),
                     ];
                 }),
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),

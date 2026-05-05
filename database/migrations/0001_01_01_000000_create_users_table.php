@@ -19,7 +19,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('nisn', 20)->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->boolean('is_active')->nullable()->default(true);
             $table->string('phone', 20)->nullable();
             $table->text('address')->nullable();
             $table->string('avatar')->nullable();

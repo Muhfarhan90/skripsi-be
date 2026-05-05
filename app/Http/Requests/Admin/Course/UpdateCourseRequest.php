@@ -27,7 +27,7 @@ class UpdateCourseRequest extends FormRequest
             'description' => 'nullable|string',
             'category_id' => 'sometimes|required|exists:categories,id',
             'instructor_id' => 'sometimes|required|exists:users,id',
-            'price' => 'sometimes|required|numeric|min:0',
+            'price' => 'sometimes|nullable|numeric|min:0',
             'discount_price' => 'nullable|numeric|min:0|lte:price',
             'thumbnail' => 'nullable|image|max:2048',
             'status' => 'sometimes|required|in:draft,published,archived',
