@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('discount', 10, 2)->nullable()->default(0);
             $table->decimal('tax', 10, 2)->nullable()->default(0);
             $table->decimal('admin_fee', 10, 2)->nullable()->default(0);
+            $table->text('note')->nullable();
             $table->decimal('grand_total', 10, 2);
             $table->string('status')->nullable()->default('pending'); // pending, completed, cancelled
             $table->timestamps();

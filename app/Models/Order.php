@@ -14,6 +14,7 @@ class Order extends Model
         'discount',
         'tax',
         'admin_fee',
+        'note',
         'grand_total',
         'status',
     ];

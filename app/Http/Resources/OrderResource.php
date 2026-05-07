@@ -18,6 +18,7 @@ class OrderResource extends JsonResource
             'discount' => (float) $this->discount,
             'tax' => (float) $this->tax,
             'admin_fee' => (float) $this->admin_fee,
+            'note' => $this->note,
             'grand_total' => (float) $this->grand_total,
             'status' => $this->status,
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),

@@ -12,7 +12,7 @@ class TransactionResource extends JsonResource
         return [
             'id' => $this->id,
             'order_id' => $this->order_id,
-            'transaction_number' => $this->transaction_number,
+            'invoice_code' => $this->invoice_code,
             'external_id' => $this->external_id,
             'payment_method' => $this->payment_method,
             'payment_channel' => $this->payment_channel,

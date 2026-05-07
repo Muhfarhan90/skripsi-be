@@ -77,7 +77,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, string $id)
     {
         $request->validate([
-            'status' => 'required|string|in:pending,completed,cancelled',
+            'status' => 'required|string|in:cart,pending,completed,cancelled',
         ]);
 
         $order = $this->service->updateStatus((int) $id, $request->status);
