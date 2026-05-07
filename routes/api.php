@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VoucherController;
 use App\Http\Controllers\Api\Admin\ForumController as AdminForumController;
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
+use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\CourseCatalogController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\ForumController;
 use App\Http\Controllers\Api\ReviewController;
@@ -43,9 +45,19 @@ Route::prefix('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
 
+Route::get('/courses', [CourseCatalogController::class, 'index']);
+Route::get('/courses/{slug}', [CourseCatalogController::class, 'show']);
+
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/cart', [CartController::class, 'show']);
+    Route::post('/cart/items', [CartController::class, 'addItem']);
+    Route::delete('/cart/items/{courseId}', [CartController::class, 'removeItem']);
+    Route::post('/cart/checkout', [CartController::class, 'checkout']);
+
     Route::get('/enrollments', [EnrollmentController::class, 'index']);
     Route::get('/enrollments/{id}', [EnrollmentController::class, 'show']);
+    Route::get('/enrollments/{id}/curriculum', [EnrollmentController::class, 'curriculum']);
+    Route::get('/enrollments/{id}/lessons/{lessonId}', [EnrollmentController::class, 'lessonDetail']);
     Route::get('/enrollments/{id}/progress-summary', [EnrollmentController::class, 'progressSummary']);
     Route::get('/enrollments/{id}/next-lesson', [EnrollmentController::class, 'nextLesson']);
     Route::post('/enrollments/{id}/complete', [EnrollmentController::class, 'complete']);
@@ -63,6 +75,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::patch('/orders/{id}/payment-submission', [OrderController::class, 'submitPayment']);
 
     // Forum (Student) - harus enrolled
     Route::get('/courses/{courseId}/forum', [ForumController::class, 'index']);
@@ -86,7 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'generate']);
 });
 
-Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
+Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::get('/courses/{courseId}/curriculum', [CourseController::class, 'curriculum']);
     Route::put('/courses/{courseId}/curriculum', [CourseController::class, 'upsertCurriculum']);
     Route::get('/courses/{courseId}/quizzes', [QuizController::class, 'indexByCourse']);
@@ -136,14 +149,14 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     Route::delete('/courses/{courseId}/reviews/{reviewId}', [AdminReviewController::class, 'destroy']);
 });
 
-Route::apiResource('admin/categories', CategoryController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/courses', CourseController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/sections', SectionController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/lessons', LessonController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/quizzes', QuizController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/questions', QuestionController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/options', OptionController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/vouchers', VoucherController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/transactions', TransactionController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/users', UserController::class)->middleware('auth:sanctum');
-Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware('auth:sanctum');
+Route::apiResource('admin/categories', CategoryController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/courses', CourseController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/sections', SectionController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/lessons', LessonController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/quizzes', QuizController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/questions', QuestionController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/options', OptionController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/vouchers', VoucherController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/transactions', TransactionController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/users', UserController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);
