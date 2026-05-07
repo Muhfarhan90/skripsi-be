@@ -20,9 +20,13 @@ class CourseResource extends JsonResource
             'slug' => $this->slug,
             'description' => $this->description,
             'category_id' => $this->category_id,
+            'category_name' => $this->relationLoaded('category') ? $this->category?->name : null,
             'instructor_id' => $this->instructor_id,
-            'price' => $this->price,
-            'discount_price' => $this->discount_price,
+            'instructor_name' => $this->relationLoaded('instructor') ? $this->instructor?->fullname : null,
+            'price' => $this->price !== null ? (float) $this->price : null,
+            'discount_price' => $this->discount_price !== null && (float) $this->discount_price > 0
+                ? (float) $this->discount_price
+                : null,
             'thumbnail' => $this->thumbnail,
             'status' => $this->status,
             'requirements' => $this->requirements,

@@ -26,6 +26,11 @@ class Course extends Model
         'rating'
     ];
 
+    protected $casts = [
+        'price' => 'float',
+        'discount_price' => 'float',
+    ];
+
     public function category()
     {
         return $this->belongsTo(Category::class, 'category_id');

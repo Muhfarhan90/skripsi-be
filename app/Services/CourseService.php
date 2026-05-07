@@ -16,14 +16,40 @@ class CourseService
         return Course::latest()->paginate(10);
     }
 
+    public function getPublishedCatalog()
+    {
+        return Course::query()
+            ->with([
+                'category:id,name',
+                'instructor:id,fullname',
+            ])
+            ->where('status', 'published')
+            ->latest()
+            ->paginate(12);
+    }
+
     public function findById(int $id)
     {
         return Course::findOrFail($id);
     }
 
+    public function findPublishedBySlug(string $slug): Course
+    {
+        return Course::query()
+            ->with([
+                'category:id,name',
+                'instructor:id,fullname',
+            ])
+            ->where('slug', $slug)
+            ->where('status', 'published')
+            ->firstOrFail();
+    }
+
     public function findByIdWithCurriculum(int $id)
     {
         return Course::with([
+            'category:id,name',
+            'instructor:id,fullname',
             'sections' => function ($query) {
                 $query->orderBy('sort_order')->orderBy('id');
             },
@@ -38,6 +64,7 @@ class CourseService
 
     public function create(array $data)
     {
+        $data = $this->normalizeCoursePricing($data);
         $data['slug'] = Str::slug($data['title']);
         return Course::create($data);
     }
@@ -45,6 +72,7 @@ class CourseService
     public function update(int $id, array $data)
     {
         $course = $this->findById($id);
+        $data = $this->normalizeCoursePricing($data);
         if (isset($data['title'])) {
             $data['slug'] = Str::slug($data['title']);
         }
@@ -151,5 +179,33 @@ class CourseService
         $course->delete();
 
         return true;
+    }
+
+    private function normalizeCoursePricing(array $data): array
+    {
+        if (array_key_exists('price', $data) && $data['price'] !== null) {
+            $data['price'] = (float) $data['price'];
+        }
+
+        if (array_key_exists('discount_price', $data)) {
+            if ($data['discount_price'] === null || $data['discount_price'] === '') {
+                $data['discount_price'] = null;
+            } else {
+                $discount = (float) $data['discount_price'];
+                $price = array_key_exists('price', $data) && $data['price'] !== null
+                    ? (float) $data['price']
+                    : null;
+
+                if ($discount <= 0) {
+                    $data['discount_price'] = null;
+                } elseif ($price !== null && $discount >= $price) {
+                    $data['discount_price'] = null;
+                } else {
+                    $data['discount_price'] = $discount;
+                }
+            }
+        }
+
+        return $data;
     }
 }

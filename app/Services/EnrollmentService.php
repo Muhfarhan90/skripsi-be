@@ -22,14 +22,21 @@ class EnrollmentService
 
     public function getAllByUser(int $userId)
     {
-        return Enrollment::where('user_id', $userId)
+        return Enrollment::with([
+            'course.category:id,name',
+            'course.instructor:id,fullname',
+        ])->where('user_id', $userId)
             ->latest()
             ->paginate(10);
     }
 
     public function findByIdForUser(int $userId, int $id): Enrollment
     {
-        return Enrollment::where('user_id', $userId)
+        return Enrollment::with([
+            'course.category:id,name',
+            'course.instructor:id,fullname',
+            'order',
+        ])->where('user_id', $userId)
             ->findOrFail($id);
     }
 
@@ -95,6 +102,28 @@ class EnrollmentService
             ->orderBy('lessons.sort_order')
             ->orderBy('lessons.id')
             ->first();
+    }
+
+    public function findLessonDetailForUser(int $userId, int $enrollmentId, int $lessonId): array
+    {
+        $enrollment = $this->findByIdForUser($userId, $enrollmentId);
+
+        $lesson = Lesson::with('section')
+            ->where('id', $lessonId)
+            ->whereHas('section', function ($query) use ($enrollment) {
+                $query->where('course_id', $enrollment->course_id);
+            })
+            ->firstOrFail();
+
+        $progress = LessonProgress::where('enrollment_id', $enrollment->id)
+            ->where('lesson_id', $lesson->id)
+            ->first();
+
+        return [
+            'enrollment' => $enrollment,
+            'lesson' => $lesson,
+            'progress' => $progress,
+        ];
     }
 
     public function getAllForAdmin()
