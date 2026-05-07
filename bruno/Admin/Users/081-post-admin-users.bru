@@ -1,0 +1,30 @@
+meta {
+  name: POST users.store
+  type: http
+  seq: 81
+}
+
+post {
+  url: {{baseUrl}}/admin/users
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/users
+  Action: App\Http\Controllers\Api\Admin\UserController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

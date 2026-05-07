@@ -1,0 +1,25 @@
+meta {
+  name: GET admin courses courseId enrollments
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/enrollments
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/enrollments
+  Action: App\Http\Controllers\Api\Admin\EnrollmentController@byCourse
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

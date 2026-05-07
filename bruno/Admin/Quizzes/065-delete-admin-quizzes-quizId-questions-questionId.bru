@@ -1,0 +1,25 @@
+meta {
+  name: DELETE admin quizzes quizId questions questionId
+  type: http
+  seq: 65
+}
+
+delete {
+  url: {{baseUrl}}/admin/quizzes/{{quizId}}/questions/{{questionId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/quizzes/{quizId}/questions/{questionId}
+  Action: App\Http\Controllers\Api\Admin\QuestionController@destroyForQuiz
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

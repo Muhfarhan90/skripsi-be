@@ -1,0 +1,25 @@
+meta {
+  name: GET questions.index
+  type: http
+  seq: 48
+}
+
+get {
+  url: {{baseUrl}}/admin/questions
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/questions
+  Action: App\Http\Controllers\Api\Admin\QuestionController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

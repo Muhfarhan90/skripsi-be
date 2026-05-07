@@ -1,0 +1,30 @@
+meta {
+  name: POST admin quizzes quizId questions
+  type: http
+  seq: 64
+}
+
+post {
+  url: {{baseUrl}}/admin/quizzes/{{quizId}}/questions
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/quizzes/{quizId}/questions
+  Action: App\Http\Controllers\Api\Admin\QuestionController@storeForQuiz
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

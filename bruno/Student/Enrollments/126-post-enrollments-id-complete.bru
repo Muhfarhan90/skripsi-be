@@ -1,0 +1,30 @@
+meta {
+  name: POST enrollments id complete
+  type: http
+  seq: 126
+}
+
+post {
+  url: {{baseUrl}}/enrollments/{{id}}/complete
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/enrollments/{id}/complete
+  Action: App\Http\Controllers\Api\EnrollmentController@complete
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

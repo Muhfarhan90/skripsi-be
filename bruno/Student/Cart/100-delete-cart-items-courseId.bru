@@ -1,0 +1,25 @@
+meta {
+  name: DELETE cart items courseId
+  type: http
+  seq: 100
+}
+
+delete {
+  url: {{baseUrl}}/cart/items/{{courseId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/cart/items/{courseId}
+  Action: App\Http\Controllers\Api\CartController@removeItem
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

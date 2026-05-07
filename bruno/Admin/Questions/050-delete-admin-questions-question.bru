@@ -1,0 +1,25 @@
+meta {
+  name: DELETE questions.destroy
+  type: http
+  seq: 50
+}
+
+delete {
+  url: {{baseUrl}}/admin/questions/{{question}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/questions/{question}
+  Action: App\Http\Controllers\Api\Admin\QuestionController@destroy
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

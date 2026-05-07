@@ -1,0 +1,30 @@
+meta {
+  name: PUT options.update
+  type: http
+  seq: 43
+}
+
+put {
+  url: {{baseUrl}}/admin/options/{{option}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/options/{option}
+  Action: App\Http\Controllers\Api\Admin\OptionController@update
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

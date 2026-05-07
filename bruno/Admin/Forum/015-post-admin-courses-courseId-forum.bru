@@ -1,0 +1,30 @@
+meta {
+  name: Create Forum Post (Admin)
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/forum
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/forum
+  Action: App\Http\Controllers\Api\Admin\ForumController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

@@ -1,0 +1,25 @@
+meta {
+  name: GET quizzes.index
+  type: http
+  seq: 56
+}
+
+get {
+  url: {{baseUrl}}/admin/quizzes
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/quizzes
+  Action: App\Http\Controllers\Api\Admin\QuizController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

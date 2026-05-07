@@ -1,0 +1,25 @@
+meta {
+  name: DELETE categories.destroy
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/admin/categories/{{category}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/categories/{category}
+  Action: App\Http\Controllers\Api\Admin\CategoryController@destroy
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

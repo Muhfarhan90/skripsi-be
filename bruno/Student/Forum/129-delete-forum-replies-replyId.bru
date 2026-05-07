@@ -1,0 +1,25 @@
+meta {
+  name: Delete Forum Reply
+  type: http
+  seq: 129
+}
+
+delete {
+  url: {{baseUrl}}/forum-replies/{{replyId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/forum-replies/{replyId}
+  Action: App\Http\Controllers\Api\ForumController@destroyReply
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

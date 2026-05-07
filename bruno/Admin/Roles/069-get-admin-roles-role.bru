@@ -1,0 +1,25 @@
+meta {
+  name: GET roles.show
+  type: http
+  seq: 69
+}
+
+get {
+  url: {{baseUrl}}/admin/roles/{{role}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/roles/{role}
+  Action: App\Http\Controllers\Api\Admin\RoleController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

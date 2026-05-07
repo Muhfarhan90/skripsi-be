@@ -1,0 +1,30 @@
+meta {
+  name: POST sections.store
+  type: http
+  seq: 71
+}
+
+post {
+  url: {{baseUrl}}/admin/sections
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/sections
+  Action: App\Http\Controllers\Api\Admin\SectionController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

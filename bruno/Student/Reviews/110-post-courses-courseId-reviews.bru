@@ -1,0 +1,30 @@
+meta {
+  name: Create Course Review
+  type: http
+  seq: 110
+}
+
+post {
+  url: {{baseUrl}}/courses/{{courseId}}/reviews
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/courses/{courseId}/reviews
+  Action: App\Http\Controllers\Api\ReviewController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

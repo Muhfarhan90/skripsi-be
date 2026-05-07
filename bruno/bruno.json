@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Skripsi BE API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

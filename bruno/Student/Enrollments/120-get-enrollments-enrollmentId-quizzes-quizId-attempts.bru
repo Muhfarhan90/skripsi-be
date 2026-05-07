@@ -1,0 +1,25 @@
+meta {
+  name: GET enrollments enrollmentId quizzes quizId attempts
+  type: http
+  seq: 120
+}
+
+get {
+  url: {{baseUrl}}/enrollments/{{enrollmentId}}/quizzes/{{quizId}}/attempts
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/enrollments/{enrollmentId}/quizzes/{quizId}/attempts
+  Action: App\Http\Controllers\Api\QuizAttemptController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

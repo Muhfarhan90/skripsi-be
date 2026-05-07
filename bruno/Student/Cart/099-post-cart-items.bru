@@ -1,0 +1,30 @@
+meta {
+  name: POST cart items
+  type: http
+  seq: 99
+}
+
+post {
+  url: {{baseUrl}}/cart/items
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/cart/items
+  Action: App\Http\Controllers\Api\CartController@addItem
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

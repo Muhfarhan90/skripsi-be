@@ -1,0 +1,25 @@
+meta {
+  name: DELETE transactions.destroy
+  type: http
+  seq: 77
+}
+
+delete {
+  url: {{baseUrl}}/admin/transactions/{{transaction}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/transactions/{transaction}
+  Action: App\Http\Controllers\Api\Admin\TransactionController@destroy
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

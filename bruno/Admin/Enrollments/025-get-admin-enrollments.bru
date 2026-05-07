@@ -1,0 +1,25 @@
+meta {
+  name: GET admin enrollments
+  type: http
+  seq: 25
+}
+
+get {
+  url: {{baseUrl}}/admin/enrollments
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/enrollments
+  Action: App\Http\Controllers\Api\Admin\EnrollmentController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

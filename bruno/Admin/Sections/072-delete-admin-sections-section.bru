@@ -1,0 +1,25 @@
+meta {
+  name: DELETE sections.destroy
+  type: http
+  seq: 72
+}
+
+delete {
+  url: {{baseUrl}}/admin/sections/{{section}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/sections/{section}
+  Action: App\Http\Controllers\Api\Admin\SectionController@destroy
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

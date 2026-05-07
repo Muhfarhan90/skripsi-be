@@ -1,0 +1,30 @@
+meta {
+  name: POST vouchers.store
+  type: http
+  seq: 86
+}
+
+post {
+  url: {{baseUrl}}/admin/vouchers
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/vouchers
+  Action: App\Http\Controllers\Api\Admin\VoucherController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

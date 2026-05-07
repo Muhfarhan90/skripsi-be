@@ -1,0 +1,30 @@
+meta {
+  name: Update Forum Post
+  type: http
+  seq: 107
+}
+
+put {
+  url: {{baseUrl}}/courses/{{courseId}}/forum/{{postId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/courses/{courseId}/forum/{postId}
+  Action: App\Http\Controllers\Api\ForumController@update
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

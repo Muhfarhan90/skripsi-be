@@ -1,0 +1,30 @@
+meta {
+  name: POST admin courses courseId sections sectionId quizzes
+  type: http
+  seq: 23
+}
+
+post {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/sections/{{sectionId}}/quizzes
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/sections/{sectionId}/quizzes
+  Action: App\Http\Controllers\Api\Admin\QuizController@storeForSection
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

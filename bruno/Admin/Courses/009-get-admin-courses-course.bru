@@ -1,0 +1,25 @@
+meta {
+  name: GET courses.show
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/admin/courses/{{course}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/courses/{course}
+  Action: App\Http\Controllers\Api\Admin\CourseController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

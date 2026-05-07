@@ -1,0 +1,30 @@
+meta {
+  name: PUT categories.update
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/admin/categories/{{category}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/categories/{category}
+  Action: App\Http\Controllers\Api\Admin\CategoryController@update
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

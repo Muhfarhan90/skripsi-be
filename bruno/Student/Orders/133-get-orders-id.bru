@@ -1,0 +1,25 @@
+meta {
+  name: GET orders id
+  type: http
+  seq: 133
+}
+
+get {
+  url: {{baseUrl}}/orders/{{id}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/orders/{id}
+  Action: App\Http\Controllers\Api\OrderController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

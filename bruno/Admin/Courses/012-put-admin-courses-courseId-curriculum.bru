@@ -1,0 +1,30 @@
+meta {
+  name: PUT admin courses courseId curriculum
+  type: http
+  seq: 12
+}
+
+put {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/curriculum
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/curriculum
+  Action: App\Http\Controllers\Api\Admin\CourseController@upsertCurriculum
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

@@ -1,0 +1,30 @@
+meta {
+  name: POST courses.store
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/admin/courses
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/courses
+  Action: App\Http\Controllers\Api\Admin\CourseController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

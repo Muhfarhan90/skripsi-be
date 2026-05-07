@@ -1,0 +1,25 @@
+meta {
+  name: GET categories.show
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/admin/categories/{{category}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/categories/{category}
+  Action: App\Http\Controllers\Api\Admin\CategoryController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

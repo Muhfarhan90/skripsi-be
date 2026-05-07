@@ -1,0 +1,30 @@
+meta {
+  name: Logout
+  type: http
+  seq: 92
+}
+
+post {
+  url: {{baseUrl}}/auth/logout
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/auth/logout
+  Action: App\Http\Controllers\Api\AuthController@logout
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

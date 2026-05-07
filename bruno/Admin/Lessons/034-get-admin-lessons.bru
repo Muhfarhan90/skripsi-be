@@ -1,0 +1,25 @@
+meta {
+  name: GET lessons.index
+  type: http
+  seq: 34
+}
+
+get {
+  url: {{baseUrl}}/admin/lessons
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/lessons
+  Action: App\Http\Controllers\Api\Admin\LessonController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

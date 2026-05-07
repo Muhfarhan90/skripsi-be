@@ -1,0 +1,25 @@
+meta {
+  name: GET admin orders
+  type: http
+  seq: 44
+}
+
+get {
+  url: {{baseUrl}}/admin/orders
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/orders
+  Action: App\Http\Controllers\Api\Admin\OrderController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

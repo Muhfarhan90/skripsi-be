@@ -1,0 +1,25 @@
+meta {
+  name: GET admin quizzes quizId attempts attemptId
+  type: http
+  seq: 62
+}
+
+get {
+  url: {{baseUrl}}/admin/quizzes/{{quizId}}/attempts/{{attemptId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/quizzes/{quizId}/attempts/{attemptId}
+  Action: App\Http\Controllers\Api\Admin\QuizAttemptController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

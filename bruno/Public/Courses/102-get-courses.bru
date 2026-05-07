@@ -1,0 +1,21 @@
+meta {
+  name: GET courses
+  type: http
+  seq: 102
+}
+
+get {
+  url: {{baseUrl}}/courses
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  URI: api/courses
+  Action: App\Http\Controllers\Api\CourseCatalogController@index
+  Middleware: api
+}

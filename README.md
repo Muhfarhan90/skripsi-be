@@ -196,33 +196,30 @@ Untuk melihat daftar route aktual dari kode:
 php artisan route:list --path=api --except-vendor
 ```
 
-## 8. Swagger API Docs UI
+## 8. Bruno API Collection
 
-Dokumentasi Swagger sekarang sudah tersedia.
+Dokumentasi request API sekarang menggunakan Bruno (format `.bru`) di folder `bruno/`.
 
-- UI: `http://127.0.0.1:8000/api/docs`
-- OpenAPI spec: `docs/openapi.yaml`
-- Raw spec URL dari app: `http://127.0.0.1:8000/api/openapi.yaml`
+Setup di Bruno Desktop:
 
-Langkah pakai:
+1. Buka Bruno.
+2. Pilih **Open Collection**.
+3. Arahkan ke folder `skripsi-be/bruno`.
+4. Pilih environment `local`.
+5. Isi variable `token` setelah login dari endpoint auth.
 
-1. Jalankan server:
+Menjalankan collection via Bruno CLI (opsional):
 
 ```bash
-php artisan serve
-```
-
-2. Login lewat endpoint `/api/auth/login` untuk dapat token.
-
-3. Di Swagger UI, klik tombol **Authorize**, lalu isi:
-
-```text
-Bearer <token_anda>
+cd bruno
+bru run --env local
 ```
 
 Catatan:
-- Dokumen Swagger saat ini fokus pada endpoint inti (Auth, Student flow utama, dan Admin flow utama).
-- Endpoint lain bisa ditambahkan dengan pola yang sama langsung di `docs/openapi.yaml`.
+- Environment ada di `bruno/environments/local.bru`.
+- Request login Bruno (`bruno/Auth/091-post-auth-login.bru`) sudah punya `script:post-response` untuk auto-save token ke env `token`.
+- Setelah login sukses, token akan terisi otomatis ke `local.bru` (persist), jadi endpoint `auth:sanctum` bisa langsung dipakai.
+- Jika endpoint berubah, update file request `.bru` yang relevan langsung di folder `bruno/`.
 
 ## 9. Format Response API
 
@@ -372,6 +369,6 @@ php artisan db:seed
 
 ## 14. Catatan Penting
 
-- Dokumentasi OpenAPI ada di `docs/openapi.yaml`.
-- Otorisasi route admin saat ini berbasis middleware `auth:sanctum`; validasi role detail ada di beberapa service (contoh `ForumService`, `ReviewService`).
-- Jika mau production-ready penuh, lanjutkan dengan policy/gate yang konsisten di seluruh endpoint admin.
+- Dokumentasi request API utama ada di folder `bruno/`.
+- Otorisasi route admin berbasis middleware `auth:sanctum` + `admin`.
+- Jika mau production-ready penuh, pertahankan policy/gate yang konsisten di seluruh endpoint admin.

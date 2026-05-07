@@ -1,0 +1,25 @@
+meta {
+  name: List Forum Posts
+  type: http
+  seq: 103
+}
+
+get {
+  url: {{baseUrl}}/courses/{{courseId}}/forum
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/courses/{courseId}/forum
+  Action: App\Http\Controllers\Api\ForumController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

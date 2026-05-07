@@ -1,0 +1,30 @@
+meta {
+  name: PUT admin quizzes quizId questions questionId
+  type: http
+  seq: 66
+}
+
+put {
+  url: {{baseUrl}}/admin/quizzes/{{quizId}}/questions/{{questionId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/quizzes/{quizId}/questions/{questionId}
+  Action: App\Http\Controllers\Api\Admin\QuestionController@updateForQuiz
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Get Forum Post Detail (Admin)
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/forum/{{postId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/forum/{postId}
+  Action: App\Http\Controllers\Api\Admin\ForumController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

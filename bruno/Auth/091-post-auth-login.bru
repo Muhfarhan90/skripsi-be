@@ -1,0 +1,38 @@
+meta {
+  name: Login
+  type: http
+  seq: 91
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "student@example.com",
+    "password": "password"
+  }
+}
+
+script:post-response {
+  const token = res?.body?.data?.token || res?.body?.token;
+
+  if (token && typeof token === 'string') {
+    bru.setEnvVar('token', token, { persist: true });
+  }
+}
+
+docs {
+  URI: api/auth/login
+  Action: App\Http\Controllers\Api\AuthController@login
+  Middleware: api
+}
+

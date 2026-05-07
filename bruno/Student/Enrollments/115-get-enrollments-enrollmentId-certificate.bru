@@ -1,0 +1,25 @@
+meta {
+  name: GET enrollments enrollmentId certificate
+  type: http
+  seq: 115
+}
+
+get {
+  url: {{baseUrl}}/enrollments/{{enrollmentId}}/certificate
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/enrollments/{enrollmentId}/certificate
+  Action: App\Http\Controllers\Api\CertificateController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

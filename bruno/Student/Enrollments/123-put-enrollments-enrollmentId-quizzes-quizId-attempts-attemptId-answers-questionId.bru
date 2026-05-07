@@ -1,0 +1,30 @@
+meta {
+  name: PUT enrollments enrollmentId quizzes quizId attempts attemptId answers questionId
+  type: http
+  seq: 123
+}
+
+put {
+  url: {{baseUrl}}/enrollments/{{enrollmentId}}/quizzes/{{quizId}}/attempts/{{attemptId}}/answers/{{questionId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/enrollments/{enrollmentId}/quizzes/{quizId}/attempts/{attemptId}/answers/{questionId}
+  Action: App\Http\Controllers\Api\QuizAttemptController@upsertAnswer
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

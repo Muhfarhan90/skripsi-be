@@ -1,0 +1,25 @@
+meta {
+  name: GET vouchers.index
+  type: http
+  seq: 85
+}
+
+get {
+  url: {{baseUrl}}/admin/vouchers
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/vouchers
+  Action: App\Http\Controllers\Api\Admin\VoucherController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

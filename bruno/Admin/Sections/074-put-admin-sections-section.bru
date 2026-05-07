@@ -1,0 +1,30 @@
+meta {
+  name: PUT sections.update
+  type: http
+  seq: 74
+}
+
+put {
+  url: {{baseUrl}}/admin/sections/{{section}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/sections/{section}
+  Action: App\Http\Controllers\Api\Admin\SectionController@update
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

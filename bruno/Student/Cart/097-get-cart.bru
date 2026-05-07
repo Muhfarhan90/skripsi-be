@@ -1,0 +1,25 @@
+meta {
+  name: GET cart
+  type: http
+  seq: 97
+}
+
+get {
+  url: {{baseUrl}}/cart
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/cart
+  Action: App\Http\Controllers\Api\CartController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

@@ -1,0 +1,30 @@
+meta {
+  name: Toggle Forum Pin (Admin)
+  type: http
+  seq: 19
+}
+
+patch {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/forum/{{postId}}/pin
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/forum/{postId}/pin
+  Action: App\Http\Controllers\Api\Admin\ForumController@togglePin
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

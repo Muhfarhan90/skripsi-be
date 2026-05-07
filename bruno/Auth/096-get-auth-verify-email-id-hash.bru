@@ -1,0 +1,21 @@
+meta {
+  name: Verify Email
+  type: http
+  seq: 96
+}
+
+get {
+  url: {{baseUrl}}/auth/verify-email/{{id}}/{{hash}}
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  URI: api/auth/verify-email/{id}/{hash}
+  Action: App\Http\Controllers\Api\AuthController@verifyEmail
+  Middleware: api
+}

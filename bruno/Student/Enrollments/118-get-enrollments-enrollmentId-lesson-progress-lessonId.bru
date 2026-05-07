@@ -1,0 +1,25 @@
+meta {
+  name: GET enrollments enrollmentId lesson-progress lessonId
+  type: http
+  seq: 118
+}
+
+get {
+  url: {{baseUrl}}/enrollments/{{enrollmentId}}/lesson-progress/{{lessonId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/enrollments/{enrollmentId}/lesson-progress/{lessonId}
+  Action: App\Http\Controllers\Api\LessonProgressController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

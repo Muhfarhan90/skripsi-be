@@ -19,6 +19,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/bruno/environments/local.bru
 Homestead.json
 Homestead.yaml
 Thumbs.db

@@ -1,0 +1,25 @@
+meta {
+  name: GET options.index
+  type: http
+  seq: 39
+}
+
+get {
+  url: {{baseUrl}}/admin/options
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/options
+  Action: App\Http\Controllers\Api\Admin\OptionController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

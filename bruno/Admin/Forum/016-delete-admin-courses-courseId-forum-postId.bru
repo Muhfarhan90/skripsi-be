@@ -1,0 +1,25 @@
+meta {
+  name: Delete Forum Post (Admin)
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/forum/{{postId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/forum/{postId}
+  Action: App\Http\Controllers\Api\Admin\ForumController@destroyPost
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

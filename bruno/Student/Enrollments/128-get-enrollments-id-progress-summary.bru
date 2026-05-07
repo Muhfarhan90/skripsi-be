@@ -1,0 +1,25 @@
+meta {
+  name: GET enrollments id progress-summary
+  type: http
+  seq: 128
+}
+
+get {
+  url: {{baseUrl}}/enrollments/{{id}}/progress-summary
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/enrollments/{id}/progress-summary
+  Action: App\Http\Controllers\Api\EnrollmentController@progressSummary
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

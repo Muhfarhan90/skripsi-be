@@ -1,0 +1,30 @@
+meta {
+  name: PUT lessons.update
+  type: http
+  seq: 38
+}
+
+put {
+  url: {{baseUrl}}/admin/lessons/{{lesson}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {}
+}
+
+docs {
+  URI: api/admin/lessons/{lesson}
+  Action: App\Http\Controllers\Api\Admin\LessonController@update
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

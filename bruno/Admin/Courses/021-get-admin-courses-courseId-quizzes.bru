@@ -1,0 +1,25 @@
+meta {
+  name: GET admin courses courseId quizzes
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/quizzes
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/quizzes
+  Action: App\Http\Controllers\Api\Admin\QuizController@indexByCourse
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

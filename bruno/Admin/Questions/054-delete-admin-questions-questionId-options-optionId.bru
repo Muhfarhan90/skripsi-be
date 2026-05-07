@@ -1,0 +1,25 @@
+meta {
+  name: DELETE admin questions questionId options optionId
+  type: http
+  seq: 54
+}
+
+delete {
+  url: {{baseUrl}}/admin/questions/{{questionId}}/options/{{optionId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/questions/{questionId}/options/{optionId}
+  Action: App\Http\Controllers\Api\Admin\OptionController@destroyForQuestion
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

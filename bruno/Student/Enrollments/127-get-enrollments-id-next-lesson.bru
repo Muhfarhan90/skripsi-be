@@ -1,0 +1,25 @@
+meta {
+  name: GET enrollments id next-lesson
+  type: http
+  seq: 127
+}
+
+get {
+  url: {{baseUrl}}/enrollments/{{id}}/next-lesson
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/enrollments/{id}/next-lesson
+  Action: App\Http\Controllers\Api\EnrollmentController@nextLesson
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}
