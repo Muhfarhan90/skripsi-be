@@ -367,7 +367,46 @@ php artisan migrate:status
 php artisan db:seed
 ```
 
-## 14. Catatan Penting
+## 14. Testing Dengan PostgreSQL
+
+Project ini memakai PostgreSQL untuk environment aplikasi dan sekarang test suite juga diarahkan ke PostgreSQL, bukan lagi SQLite in-memory.
+
+Langkah setup sekali saja:
+
+1. Copy template env testing:
+
+```bash
+cp .env.testing.example .env.testing
+```
+
+Di Windows PowerShell:
+
+```powershell
+Copy-Item .env.testing.example .env.testing
+```
+
+2. Pastikan database test terpisah sudah ada, misalnya:
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=skripsi_be_test
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+3. Jalankan test:
+
+```bash
+php artisan test
+```
+
+Catatan:
+- `composer test` akan otomatis membuat `.env.testing` dari `.env.testing.example` jika file itu belum ada.
+- Jangan arahkan test ke database development utama.
+
+## 15. Catatan Penting
 
 - Dokumentasi request API utama ada di folder `bruno/`.
 - Otorisasi route admin berbasis middleware `auth:sanctum` + `admin`.

@@ -37,8 +37,6 @@ function createCourseWithSection(string $prefix, User $instructor): array
         'description' => 'Course description',
         'category_id' => $category->id,
         'instructor_id' => $instructor->id,
-        'price' => 100000,
-        'discount_price' => 90000,
         'thumbnail' => null,
         'total_duration' => 0,
         'requirements' => null,
