@@ -14,7 +14,7 @@ class UserService
 
     public function findById(int $id)
     {
-        return User::with(['role', 'orders.transactions', 'enrollments.course'])->findOrFail($id);
+        return User::with(['role', 'orders.transactions', 'enrollments.courseOffering.course'])->findOrFail($id);
     }
 
     public function create(array $data)

@@ -14,7 +14,8 @@ class AddCartItemRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'course_id' => ['required', 'integer', 'exists:courses,id'],
+            'course_offering_id' => ['required_without:course_id', 'nullable', 'integer', 'exists:course_offerings,id'],
+            'course_id' => ['required_without:course_offering_id', 'nullable', 'integer', 'exists:courses,id'],
         ];
     }
 }

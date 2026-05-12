@@ -26,4 +26,9 @@ class Section extends Model
     {
         return $this->hasMany(Quiz::class, 'section_id');
     }
+
+    public function assignments()
+    {
+        return $this->hasMany(Assignment::class, 'section_id');
+    }
 }

@@ -10,6 +10,13 @@ use Illuminate\Validation\ValidationException;
 
 class CertificateService
 {
+    protected AssignmentService $assignmentService;
+
+    public function __construct(AssignmentService $assignmentService)
+    {
+        $this->assignmentService = $assignmentService;
+    }
+
     /**
      * Student: Mendapatkan semua sertifikat miliknya.
      */
@@ -44,6 +51,12 @@ class CertificateService
             ]);
         }
 
+        if (! $this->assignmentService->isCompletionRequirementMet($enrollment)) {
+            throw ValidationException::withMessages([
+                'assignment' => ['Required assignment approval is not complete yet.'],
+            ]);
+        }
+
         // Cek apakah sudah ada sertifikat
         $existingCertificate = Certificate::where('enrollment_id', $enrollment->id)->first();
 
@@ -55,10 +68,17 @@ class CertificateService
         $issuedAt = Carbon::now();
         $certificateNumber = 'CERT-' . $issuedAt->format('Ymd') . '-' . strtoupper(uniqid());
         $dummyUrl = url('/certificates/' . $certificateNumber . '.pdf');
+        $enrollment->loadMissing('courseOffering');
+        $courseId = $enrollment->courseOffering?->course_id;
+        if (! $courseId) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Enrollment is missing a valid course offering reference.'],
+            ]);
+        }
 
         $certificate = Certificate::create([
             'user_id' => $user->id,
-            'course_id' => $enrollment->course_id,
+            'course_id' => $courseId,
             'enrollment_id' => $enrollment->id,
             'certificate_number' => $certificateNumber,
             'certificate_url' => $dummyUrl,

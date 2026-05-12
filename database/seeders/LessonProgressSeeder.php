@@ -3,7 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Enrollment;
+use App\Models\Lesson;
 use App\Models\LessonProgress;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class LessonProgressSeeder extends Seeder
@@ -13,48 +15,111 @@ class LessonProgressSeeder extends Seeder
      */
     public function run(): void
     {
-        $rows = [
-            [
-                'enrollment_id' => 1,
-                'lesson_id' => 1,
-                'progress_seconds' => 600,
-                'last_accessed_at' => now()->subDays(2),
-                'completed_at' => now()->subDays(2),
-            ],
-            [
-                'enrollment_id' => 1,
-                'lesson_id' => 2,
-                'progress_seconds' => 300,
-                'last_accessed_at' => now()->subDay(),
-                'completed_at' => null,
-            ],
-            [
-                'enrollment_id' => 2,
-                'lesson_id' => 1,
-                'progress_seconds' => 600,
-                'last_accessed_at' => now()->subHours(12),
-                'completed_at' => now()->subHours(12),
-            ],
-        ];
+        $activeStudentId = User::where('email', 'student@example.com')->value('id');
+        $completedStudentId = User::where('email', 'student.completed@example.com')->value('id');
 
-        foreach ($rows as $row) {
+        $activeEnrollment = Enrollment::query()
+            ->where('user_id', $activeStudentId)
+            ->whereHas('courseOffering', function ($query) {
+                $query->where('title', 'Intro Programming - Cohort A1 2026');
+            })
+            ->first();
+
+        $completedEnrollment = Enrollment::query()
+            ->where('user_id', $completedStudentId)
+            ->whereHas('courseOffering', function ($query) {
+                $query->where('title', 'Intro Programming - Cohort Legacy 2025');
+            })
+            ->first();
+
+        $lessonIntroId = Lesson::where('title', 'Introduction to Programming')->value('id');
+        $lessonVariablesId = Lesson::where('title', 'Variables and Data Types')->value('id');
+        $lessonAdvancedId = Lesson::where('title', 'Advanced Web Development Techniques')->value('id');
+
+        if ($activeEnrollment && $lessonIntroId) {
             LessonProgress::updateOrCreate(
                 [
-                    'enrollment_id' => $row['enrollment_id'],
-                    'lesson_id' => $row['lesson_id'],
+                    'enrollment_id' => $activeEnrollment->id,
+                    'lesson_id' => $lessonIntroId,
                 ],
-                $row
+                [
+                    'progress_seconds' => 600,
+                    'last_accessed_at' => now()->subDays(2),
+                    'completed_at' => now()->subDays(2),
+                ]
             );
         }
 
-        Enrollment::where('id', 1)->update([
-            'last_lesson_id' => 2,
-            'progress' => 33,
-        ]);
+        if ($activeEnrollment && $lessonVariablesId) {
+            LessonProgress::updateOrCreate(
+                [
+                    'enrollment_id' => $activeEnrollment->id,
+                    'lesson_id' => $lessonVariablesId,
+                ],
+                [
+                    'progress_seconds' => 300,
+                    'last_accessed_at' => now()->subDay(),
+                    'completed_at' => null,
+                ]
+            );
+        }
 
-        Enrollment::where('id', 2)->update([
-            'last_lesson_id' => 1,
-            'progress' => 33,
-        ]);
+        if ($activeEnrollment) {
+            $activeEnrollment->update([
+                'last_lesson_id' => $lessonVariablesId,
+                'progress' => 33,
+            ]);
+        }
+
+        if ($completedEnrollment && $lessonIntroId) {
+            LessonProgress::updateOrCreate(
+                [
+                    'enrollment_id' => $completedEnrollment->id,
+                    'lesson_id' => $lessonIntroId,
+                ],
+                [
+                    'progress_seconds' => 600,
+                    'last_accessed_at' => now()->subDays(105),
+                    'completed_at' => now()->subDays(110),
+                ]
+            );
+        }
+
+        if ($completedEnrollment && $lessonVariablesId) {
+            LessonProgress::updateOrCreate(
+                [
+                    'enrollment_id' => $completedEnrollment->id,
+                    'lesson_id' => $lessonVariablesId,
+                ],
+                [
+                    'progress_seconds' => 900,
+                    'last_accessed_at' => now()->subDays(101),
+                    'completed_at' => now()->subDays(106),
+                ]
+            );
+        }
+
+        if ($completedEnrollment && $lessonAdvancedId) {
+            LessonProgress::updateOrCreate(
+                [
+                    'enrollment_id' => $completedEnrollment->id,
+                    'lesson_id' => $lessonAdvancedId,
+                ],
+                [
+                    'progress_seconds' => 1200,
+                    'last_accessed_at' => now()->subDays(98),
+                    'completed_at' => now()->subDays(103),
+                ]
+            );
+        }
+
+        if ($completedEnrollment) {
+            $completedEnrollment->update([
+                'last_lesson_id' => $lessonAdvancedId,
+                'progress' => 100,
+                'status' => 'completed',
+                'completed_at' => $completedEnrollment->completed_at ?? now()->subDays(95),
+            ]);
+        }
     }
 }

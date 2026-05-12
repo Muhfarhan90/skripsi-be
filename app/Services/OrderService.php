@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\Order;
-use App\Models\Course;
-use App\Models\OrderItem;
+use App\Models\CourseOffering;
 use App\Models\Enrollment;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Voucher;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -27,7 +28,7 @@ class OrderService
 
     public function getAllForAdmin()
     {
-        return Order::with(['user', 'items.course', 'voucher', 'transactions'])
+        return Order::with(['user', 'items.courseOffering.course', 'voucher', 'transactions'])
             ->where('status', '!=', 'cart')
             ->latest()
             ->paginate(10);
@@ -35,7 +36,8 @@ class OrderService
 
     public function findByIdForAdmin(int $id)
     {
-        return Order::with(['user', 'items.course', 'transactions', 'voucher'])->findOrFail($id);
+        return Order::with(['user', 'items.courseOffering.course', 'transactions', 'voucher'])
+            ->findOrFail($id);
     }
 
     public function updateStatus(int $id, string $status): Order
@@ -45,31 +47,28 @@ class OrderService
             $oldStatus = $order->status;
 
             if ($oldStatus === $status) {
-                return $order;
+                return $this->freshOrderWithRelations($order->id);
             }
 
-            // 1. Update Order Status
             $order->update(['status' => $status]);
 
-            // 2. Jika status berubah menjadi 'completed'
             if ($status === 'completed') {
-                // 2a. Buat atau Aktifkan Enrollments berdasarkan Order Items
                 $this->activateOrderEnrollments($order);
 
-                // 2b. Tandai Transaksi 'success'
                 $order->transactions()->where('status', 'pending')->update([
                     'status' => 'success',
                     'paid_at' => now(),
                 ]);
             }
 
-            // 3. Jika status berubah menjadi 'cancelled'
             if ($status === 'cancelled') {
-                $order->enrollments()->update(['status' => 'cancelled']);
+                $order->enrollments()
+                    ->where('status', '!=', 'completed')
+                    ->update(['status' => 'cancelled']);
                 $order->transactions()->where('status', 'pending')->update(['status' => 'failed']);
             }
 
-            return $order->fresh(['items.course', 'enrollments', 'transactions', 'voucher']);
+            return $this->freshOrderWithRelations($order->id);
         });
     }
 
@@ -89,7 +88,7 @@ class OrderService
 
     public function getAllForStudent(int $userId)
     {
-        return Order::with(['items.course', 'transactions', 'voucher'])
+        return Order::with(['items.courseOffering.course', 'transactions', 'voucher'])
             ->where('user_id', $userId)
             ->where('status', '!=', 'cart')
             ->latest()
@@ -98,7 +97,7 @@ class OrderService
 
     public function findByIdForStudent(int $id, int $userId)
     {
-        return Order::with(['items.course', 'transactions', 'voucher'])
+        return Order::with(['items.courseOffering.course', 'transactions', 'voucher'])
             ->where('user_id', $userId)
             ->where('status', '!=', 'cart')
             ->findOrFail($id);
@@ -106,34 +105,39 @@ class OrderService
 
     public function getCartForStudent(int $userId): ?Order
     {
-        return Order::with(['items.course', 'transactions', 'voucher'])
+        return Order::with(['items.courseOffering.course', 'transactions', 'voucher'])
             ->where('user_id', $userId)
             ->where('status', 'cart')
             ->latest()
             ->first();
     }
 
-    public function addCourseToCart(int $userId, int $courseId): Order
+    public function addCourseToCart(int $userId, ?int $courseOfferingId, ?int $courseId = null): Order
     {
-        return DB::transaction(function () use ($userId, $courseId) {
-            $course = Course::findOrFail($courseId);
-            $this->ensureCoursePurchasable($userId, $course->id);
+        return DB::transaction(function () use ($userId, $courseOfferingId, $courseId) {
+            $resolvedOfferingId = $this->resolveRequestedOfferingId($courseOfferingId, $courseId);
+            $offering = CourseOffering::with('course')->findOrFail($resolvedOfferingId);
+
+            $this->ensureOfferingPurchasable($userId, $offering->id);
 
             $cart = $this->lockCartForUser($userId, true);
             if (! $cart) {
-                throw new \Exception('Failed to initialize cart');
+                throw new \RuntimeException('Failed to initialize cart');
             }
 
-            $alreadyInCart = $cart->items()->where('course_id', $course->id)->exists();
+            $alreadyInCart = $cart->items()
+                ->where('course_offering_id', $offering->id)
+                ->exists();
+
             if ($alreadyInCart) {
                 throw ValidationException::withMessages([
-                    'course_id' => ['Course already exists in cart'],
+                    'course_offering_id' => ['Course offering already exists in cart'],
                 ]);
             }
 
-            $price = $this->resolveCourseSellingPrice($course);
+            $price = $this->resolveOfferingSellingPrice($offering);
             $cart->items()->create([
-                'course_id' => $course->id,
+                'course_offering_id' => $offering->id,
                 'price' => $price,
             ]);
 
@@ -143,18 +147,19 @@ class OrderService
         });
     }
 
-    public function removeCourseFromCart(int $userId, int $courseId): ?Order
+    public function removeCourseFromCart(int $userId, int $itemId): ?Order
     {
-        return DB::transaction(function () use ($userId, $courseId) {
+        return DB::transaction(function () use ($userId, $itemId) {
             $cart = $this->lockCartForUser($userId, false);
             if (! $cart) {
                 return null;
             }
 
-            $deleted = $cart->items()->where('course_id', $courseId)->delete();
+            $deleted = $cart->items()->where('course_offering_id', $itemId)->delete();
+
             if ($deleted === 0) {
                 throw ValidationException::withMessages([
-                    'course_id' => ['Course not found in cart'],
+                    'course_offering_id' => ['Course offering not found in cart'],
                 ]);
             }
 
@@ -180,7 +185,7 @@ class OrderService
                 ]);
             }
 
-            $cart->load('items.course');
+            $cart->load(['items.courseOffering.course']);
             if ($cart->items->isEmpty()) {
                 throw ValidationException::withMessages([
                     'cart' => ['Cart is empty'],
@@ -189,21 +194,27 @@ class OrderService
 
             $subtotal = 0;
             foreach ($cart->items as $item) {
-                $course = $item->course ?? Course::findOrFail($item->course_id);
-                $this->ensureCoursePurchasable($userId, (int) $course->id, (int) $cart->id);
+                $offering = $this->resolveOfferingForOrderItem($item);
+                $this->ensureOfferingPurchasable($userId, $offering->id, (int) $cart->id);
 
-                $latestPrice = $this->resolveCourseSellingPrice($course);
-                if ((float) $item->price !== (float) $latestPrice) {
-                    $item->update(['price' => $latestPrice]);
+                $latestPrice = $this->resolveOfferingSellingPrice($offering);
+                if (
+                    (float) $item->price !== (float) $latestPrice
+                    || (int) ($item->course_offering_id ?? 0) !== (int) $offering->id
+                ) {
+                    $item->update([
+                        'course_offering_id' => $offering->id,
+                        'price' => $latestPrice,
+                    ]);
                 }
                 $subtotal += $latestPrice;
             }
 
             $discount = 0;
             $voucherId = null;
-            if (!empty($data['voucher_code'])) {
+            if (! empty($data['voucher_code'])) {
                 $voucher = Voucher::where('code', $data['voucher_code'])->first();
-                if (!$voucher) {
+                if (! $voucher) {
                     throw ValidationException::withMessages([
                         'voucher_code' => ['Voucher code is invalid'],
                     ]);
@@ -268,40 +279,48 @@ class OrderService
     {
         return DB::transaction(function () use ($data) {
             $userId = $data['user_id'] ?? auth()->id();
-            $courseIds = $data['course_ids'];
             $status = $data['status'] ?? 'pending';
             $paymentMethod = $data['payment_method'] ?? 'manual';
 
-            // 1. Ambil data kursus (Security: jangan percaya harga dari frontend)
-            $courses = Course::whereIn('id', $courseIds)->get();
-            
-            if ($courses->isEmpty()) {
-                throw new \Exception('No valid courses found for the given IDs.');
+            $offeringIds = $this->normalizeRequestedOfferingIds($data);
+            if (count($offeringIds) === 0) {
+                throw ValidationException::withMessages([
+                    'course_offering_ids' => ['No valid course offerings provided'],
+                ]);
             }
 
-            // 2. Validasi Duplikasi
-            foreach ($courses as $course) {
-                $this->ensureCoursePurchasable($userId, (int) $course->id);
+            $offerings = CourseOffering::with('course')
+                ->whereIn('id', $offeringIds)
+                ->get()
+                ->keyBy('id');
+
+            if ($offerings->count() !== count($offeringIds)) {
+                throw ValidationException::withMessages([
+                    'course_offering_ids' => ['Some course offerings were not found'],
+                ]);
             }
 
-            // 3. Hitung Subtotal
             $subtotal = 0;
             $items = [];
+            foreach ($offeringIds as $offeringId) {
+                $offering = $offerings->get($offeringId);
+                if (! $offering) {
+                    continue;
+                }
 
-            foreach ($courses as $course) {
-                $price = $this->resolveCourseSellingPrice($course);
+                $this->ensureOfferingPurchasable((int) $userId, (int) $offering->id);
+                $price = $this->resolveOfferingSellingPrice($offering);
+
                 $subtotal += $price;
                 $items[] = [
-                    'course_id' => $course->id,
+                    'course_offering_id' => $offering->id,
                     'price' => $price,
                 ];
             }
 
-            // 3.1 Proses Voucher
             $discount = 0;
             $voucherId = null;
-
-            if (!empty($data['voucher_code'])) {
+            if (! empty($data['voucher_code'])) {
                 $voucher = Voucher::where('code', $data['voucher_code'])->first();
                 if ($voucher) {
                     $discountData = $this->applyVoucher($voucher, $subtotal);
@@ -312,7 +331,6 @@ class OrderService
 
             $grandTotal = max(0, $subtotal - $discount);
 
-            // 4. Buat Order (Header)
             $order = Order::create([
                 'user_id' => $userId,
                 'voucher_id' => $voucherId,
@@ -324,15 +342,10 @@ class OrderService
                 'note' => $data['note'] ?? null,
             ]);
 
-            // 5. Buat Order Items (Details)
             foreach ($items as $item) {
-                $order->items()->create([
-                    'course_id' => $item['course_id'],
-                    'price' => $item['price'],
-                ]);
+                $order->items()->create($item);
             }
 
-            // 6. Buat Transaksi Awal
             if ($status !== 'cart') {
                 $this->transactionService->create([
                     'order_id' => $order->id,
@@ -347,7 +360,7 @@ class OrderService
                 $this->activateOrderEnrollments($order);
             }
 
-            return $order->load(['items.course', 'transactions', 'voucher']);
+            return $this->freshOrderWithRelations($order->id);
         });
     }
 
@@ -359,7 +372,7 @@ class OrderService
 
     private function applyVoucher(Voucher $voucher, float $subtotal): array
     {
-        if (!$voucher->is_active || ($voucher->expired_at && $voucher->expired_at->isPast())) {
+        if (! $voucher->is_active || ($voucher->expired_at && $voucher->expired_at->isPast())) {
             throw ValidationException::withMessages(['voucher_code' => 'Voucher is inactive or expired.']);
         }
 
@@ -367,14 +380,16 @@ class OrderService
             $usedCount = Order::where('voucher_id', $voucher->id)
                 ->whereIn('status', ['completed', 'processing'])
                 ->count();
-                
+
             if ($usedCount >= $voucher->usage_limit) {
                 throw ValidationException::withMessages(['voucher_code' => 'Voucher usage limit reached.']);
             }
         }
 
         if ($subtotal < $voucher->min_purchase) {
-            throw ValidationException::withMessages(['voucher_code' => "Minimum purchase of {$voucher->min_purchase} required for this voucher."]);
+            throw ValidationException::withMessages([
+                'voucher_code' => "Minimum purchase of {$voucher->min_purchase} required for this voucher.",
+            ]);
         }
 
         $discount = 0;
@@ -407,27 +422,159 @@ class OrderService
 
     private function freshOrderWithRelations(int $orderId): Order
     {
-        return Order::with(['items.course', 'transactions', 'voucher'])
-            ->findOrFail($orderId);
+        return Order::with([
+            'items.courseOffering.course',
+            'transactions',
+            'voucher',
+            'enrollments.courseOffering.course',
+        ])->findOrFail($orderId);
     }
 
-    private function ensureCoursePurchasable(int $userId, int $courseId, ?int $excludeOrderId = null): void
+    private function normalizeRequestedOfferingIds(array $data): array
     {
-        $course = Course::findOrFail($courseId);
-        if ($course->status !== 'published') {
+        if (! empty($data['course_offering_ids']) && is_array($data['course_offering_ids'])) {
+            return array_values(array_unique(array_map('intval', $data['course_offering_ids'])));
+        }
+
+        if (! empty($data['course_ids']) && is_array($data['course_ids'])) {
+            $resolved = [];
+            foreach ($data['course_ids'] as $courseId) {
+                $resolved[] = $this->resolvePurchasableOfferingIdByCourse((int) $courseId);
+            }
+
+            return array_values(array_unique($resolved));
+        }
+
+        return [];
+    }
+
+    private function resolveRequestedOfferingId(?int $courseOfferingId, ?int $courseId): int
+    {
+        if ($courseOfferingId !== null && $courseOfferingId > 0) {
+            return $courseOfferingId;
+        }
+
+        if ($courseId !== null && $courseId > 0) {
+            return $this->resolvePurchasableOfferingIdByCourse($courseId);
+        }
+
+        throw ValidationException::withMessages([
+            'course_offering_id' => ['course_offering_id or course_id is required'],
+        ]);
+    }
+
+    private function resolvePurchasableOfferingIdByCourse(int $courseId): int
+    {
+        $now = now();
+
+        $offering = CourseOffering::query()
+            ->where('course_id', $courseId)
+            ->where(function ($query) {
+                $query->whereNull('status')->orWhere('status', 'published');
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('enrollment_open_at')->orWhere('enrollment_open_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now) {
+                $query->whereNull('enrollment_close_at')->orWhere('enrollment_close_at', '>=', $now);
+            })
+            ->orderByRaw('CASE WHEN start_at IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('start_at')
+            ->orderBy('id')
+            ->first();
+
+        if (! $offering) {
             throw ValidationException::withMessages([
-                'course_id' => ["Course ID {$courseId} is not available for purchase"],
+                'course_id' => ["No published offering is currently available for course ID: {$courseId}"],
             ]);
         }
 
-        $hasActiveAccess = Enrollment::where('user_id', $userId)
-            ->where('course_id', $courseId)
-            ->whereIn('status', ['active', 'completed'])
+        return (int) $offering->id;
+    }
+
+    private function resolveOfferingForOrderItem(OrderItem $item): CourseOffering
+    {
+        if ($item->courseOffering) {
+            return $item->courseOffering;
+        }
+
+        if ($item->course_offering_id) {
+            return CourseOffering::with('course')->findOrFail((int) $item->course_offering_id);
+        }
+
+        throw ValidationException::withMessages([
+            'course_offering_id' => ['Order item is missing course offering reference'],
+        ]);
+    }
+
+    private function ensureOfferingPurchasable(int $userId, int $offeringId, ?int $excludeOrderId = null): void
+    {
+        $now = now();
+        $offering = CourseOffering::with('course')->findOrFail($offeringId);
+        $course = $offering->course;
+
+        if (! $course) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Offering does not have a valid course'],
+            ]);
+        }
+
+        if ($offering->status !== null && $offering->status !== 'published') {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Course offering is not available for purchase'],
+            ]);
+        }
+
+        if ($offering->enrollment_open_at && $offering->enrollment_open_at->gt($now)) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Enrollment window has not opened for this offering'],
+            ]);
+        }
+
+        if ($offering->enrollment_close_at && $offering->enrollment_close_at->lt($now)) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Enrollment window is closed for this offering'],
+            ]);
+        }
+
+        if ($offering->capacity !== null && $offering->capacity > 0) {
+            $enrolledCount = Enrollment::where('course_offering_id', $offering->id)
+                ->whereIn('status', ['pending', 'active', 'completed'])
+                ->count();
+
+            if ($enrolledCount >= $offering->capacity) {
+                throw ValidationException::withMessages([
+                    'course_offering_id' => ['Course offering capacity has been reached'],
+                ]);
+            }
+        }
+
+        $hasCompletedEnrollment = Enrollment::where('user_id', $userId)
+            ->whereHas('courseOffering', function ($query) use ($course) {
+                $query->where('course_id', $course->id);
+            })
+            ->where('status', 'completed')
             ->exists();
 
-        if ($hasActiveAccess) {
+        if ($hasCompletedEnrollment) {
             throw ValidationException::withMessages([
-                'course_id' => ["User already has active enrollment for course ID: {$courseId}"],
+                'course_id' => ["User already completed course ID: {$course->id}"],
+            ]);
+        }
+
+        $hasCurrentAccess = Enrollment::where('user_id', $userId)
+            ->whereHas('courseOffering', function ($query) use ($course) {
+                $query->where('course_id', $course->id);
+            })
+            ->whereIn('status', ['pending', 'active'])
+            ->where(function ($query) use ($now) {
+                $query->whereNull('ended_at')->orWhere('ended_at', '>=', $now);
+            })
+            ->exists();
+
+        if ($hasCurrentAccess) {
+            throw ValidationException::withMessages([
+                'course_id' => ["User already has pending or active enrollment for course ID: {$course->id}"],
             ]);
         }
 
@@ -438,11 +585,11 @@ class OrderService
             if ($excludeOrderId !== null) {
                 $query->where('id', '!=', $excludeOrderId);
             }
-        })->where('course_id', $courseId);
+        })->where('course_offering_id', $offeringId);
 
         if ($pendingOrCompletedOrderQuery->exists()) {
             throw ValidationException::withMessages([
-                'course_id' => ["User already has pending or completed order for course ID: {$courseId}"],
+                'course_offering_id' => ["User already has pending or completed order for offering ID: {$offeringId}"],
             ]);
         }
     }
@@ -487,28 +634,67 @@ class OrderService
         $cart->save();
     }
 
-    private function activateOrderEnrollments(Order $order): void
+    public function activateOrderEnrollments(Order $order): void
     {
-        $order->loadMissing('items');
+        $order->loadMissing('items.courseOffering.course');
 
         foreach ($order->items as $item) {
-            Enrollment::updateOrCreate(
-                [
-                    'user_id' => $order->user_id,
-                    'course_id' => $item->course_id,
-                ],
-                [
-                    'order_id' => $order->id,
-                    'status' => 'active',
-                ]
-            );
+            $offering = $this->resolveOfferingForOrderItem($item);
+
+            $startedAt = $offering->start_at ?? now();
+            $endedAt = $this->resolveEnrollmentEndAt($offering);
+            $status = $this->resolveEnrollmentStatus($startedAt, $endedAt);
+
+            $enrollment = Enrollment::firstOrNew([
+                'user_id' => $order->user_id,
+                'course_offering_id' => $offering->id,
+            ]);
+
+            $payload = [
+                'course_offering_id' => $offering->id,
+                'order_id' => $order->id,
+                'status' => $enrollment->status === 'completed' ? 'completed' : $status,
+                'started_at' => $startedAt,
+                'ended_at' => $endedAt,
+                // Keep compatibility with existing API that still exposes expired_at.
+                'expired_at' => $endedAt,
+            ];
+
+            if ($enrollment->status === 'completed') {
+                $payload['completed_at'] = $enrollment->completed_at ?? now();
+            }
+
+            $enrollment->fill($payload);
+            $enrollment->save();
         }
     }
 
-    private function resolveCourseSellingPrice(Course $course): float
+    private function resolveEnrollmentEndAt(CourseOffering $offering): ?Carbon
     {
-        $basePrice = (float) ($course->price ?? 0);
-        $discountPrice = $course->discount_price !== null ? (float) $course->discount_price : null;
+        if ($offering->end_at) {
+            return $offering->end_at;
+        }
+
+        return null;
+    }
+
+    private function resolveEnrollmentStatus(?Carbon $startedAt, ?Carbon $endedAt): string
+    {
+        $now = now();
+        if ($startedAt && $now->lt($startedAt)) {
+            return 'pending';
+        }
+        if ($endedAt && $now->gt($endedAt)) {
+            return 'expired';
+        }
+
+        return 'active';
+    }
+
+    private function resolveOfferingSellingPrice(CourseOffering $offering): float
+    {
+        $basePrice = $offering->price !== null ? (float) $offering->price : 0.0;
+        $discountPrice = $offering->discount_price !== null ? (float) $offering->discount_price : null;
 
         if ($discountPrice !== null && $discountPrice > 0 && $discountPrice < $basePrice) {
             return $discountPrice;

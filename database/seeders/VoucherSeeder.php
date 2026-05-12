@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Voucher;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class VoucherSeeder extends Seeder
@@ -37,8 +36,10 @@ class VoucherSeeder extends Seeder
         ];
 
         foreach ($vouchers as $voucher) {
-            Voucher::create($voucher);
+            Voucher::updateOrCreate(
+                ['code' => $voucher['code']],
+                $voucher
+            );
         }
-
     }
 }

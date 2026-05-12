@@ -56,6 +56,7 @@ class LessonProgressService
     public function upsertByEnrollmentAndLesson(int $userId, int $enrollmentId, int $lessonId, array $data): LessonProgress
     {
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
+        $this->enrollmentService->assertCanWriteLearning($enrollment);
 
         return $this->persistProgress($enrollment, $lessonId, $data);
     }
@@ -82,8 +83,10 @@ class LessonProgressService
     private function persistProgress(Enrollment $enrollment, int $lessonId, array $data): LessonProgress
     {
         $lesson = Lesson::with('section')->findOrFail($lessonId);
+        $enrollment->loadMissing('courseOffering');
+        $courseId = $enrollment->courseOffering?->course_id;
 
-        if (! $lesson->section || (int) $lesson->section->course_id !== (int) $enrollment->course_id) {
+        if (! $lesson->section || (int) $lesson->section->course_id !== (int) $courseId) {
             throw ValidationException::withMessages([
                 'lesson_id' => ['Lesson does not belong to the enrolled course'],
             ]);

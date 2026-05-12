@@ -13,7 +13,14 @@ class CourseService
 {
     public function getAll()
     {
-        return Course::latest()->paginate(10);
+        return Course::query()
+            ->with([
+                'category:id,name',
+                'instructor:id,fullname',
+                'skills:id,name,slug',
+            ])
+            ->latest()
+            ->paginate(10);
     }
 
     public function getPublishedCatalog()
@@ -22,15 +29,26 @@ class CourseService
             ->with([
                 'category:id,name',
                 'instructor:id,fullname',
+                'skills:id,name,slug',
             ])
-            ->where('status', 'published')
+            ->whereHas('courseOfferings', function ($query) {
+                $query->where(function ($q) {
+                    $q->whereNull('status')->orWhere('status', 'published');
+                });
+            })
             ->latest()
             ->paginate(12);
     }
 
     public function findById(int $id)
     {
-        return Course::findOrFail($id);
+        return Course::query()
+            ->with([
+                'category:id,name',
+                'instructor:id,fullname',
+                'skills:id,name,slug',
+            ])
+            ->findOrFail($id);
     }
 
     public function findPublishedBySlug(string $slug): Course
@@ -39,9 +57,14 @@ class CourseService
             ->with([
                 'category:id,name',
                 'instructor:id,fullname',
+                'skills:id,name,slug',
             ])
             ->where('slug', $slug)
-            ->where('status', 'published')
+            ->whereHas('courseOfferings', function ($query) {
+                $query->where(function ($q) {
+                    $q->whereNull('status')->orWhere('status', 'published');
+                });
+            })
             ->firstOrFail();
     }
 
@@ -50,6 +73,7 @@ class CourseService
         return Course::with([
             'category:id,name',
             'instructor:id,fullname',
+            'skills:id,name,slug',
             'sections' => function ($query) {
                 $query->orderBy('sort_order')->orderBy('id');
             },
@@ -64,21 +88,29 @@ class CourseService
 
     public function create(array $data)
     {
-        $data = $this->normalizeCoursePricing($data);
         $data['slug'] = Str::slug($data['title']);
-        return Course::create($data);
+        $course = Course::create($data);
+
+        return $course->load([
+            'category:id,name',
+            'instructor:id,fullname',
+            'skills:id,name,slug',
+        ]);
     }
 
     public function update(int $id, array $data)
     {
         $course = $this->findById($id);
-        $data = $this->normalizeCoursePricing($data);
         if (isset($data['title'])) {
             $data['slug'] = Str::slug($data['title']);
         }
         $course->update($data);
 
-        return $course;
+        return $course->load([
+            'category:id,name',
+            'instructor:id,fullname',
+            'skills:id,name,slug',
+        ]);
     }
 
     public function upsertCurriculum(int $courseId, array $data)
@@ -179,33 +211,5 @@ class CourseService
         $course->delete();
 
         return true;
-    }
-
-    private function normalizeCoursePricing(array $data): array
-    {
-        if (array_key_exists('price', $data) && $data['price'] !== null) {
-            $data['price'] = (float) $data['price'];
-        }
-
-        if (array_key_exists('discount_price', $data)) {
-            if ($data['discount_price'] === null || $data['discount_price'] === '') {
-                $data['discount_price'] = null;
-            } else {
-                $discount = (float) $data['discount_price'];
-                $price = array_key_exists('price', $data) && $data['price'] !== null
-                    ? (float) $data['price']
-                    : null;
-
-                if ($discount <= 0) {
-                    $data['discount_price'] = null;
-                } elseif ($price !== null && $discount >= $price) {
-                    $data['discount_price'] = null;
-                } else {
-                    $data['discount_price'] = $discount;
-                }
-            }
-        }
-
-        return $data;
     }
 }

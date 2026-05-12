@@ -40,12 +40,9 @@ function createCourseWithSection(string $prefix, User $instructor): array
         'price' => 100000,
         'discount_price' => 90000,
         'thumbnail' => null,
-        'status' => 'draft',
         'total_duration' => 0,
         'requirements' => null,
         'outcomes' => null,
-        'total_students' => 0,
-        'rating' => 0,
     ]);
 
     $section = Section::create([

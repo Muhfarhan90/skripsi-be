@@ -21,11 +21,14 @@ class CourseCurriculumResource extends JsonResource
             'category_name' => $this->relationLoaded('category') ? $this->category?->name : null,
             'instructor_id' => $this->instructor_id,
             'instructor_name' => $this->relationLoaded('instructor') ? $this->instructor?->fullname : null,
-            'price' => $this->price !== null ? (float) $this->price : null,
-            'discount_price' => $this->discount_price !== null && (float) $this->discount_price > 0
-                ? (float) $this->discount_price
-                : null,
             'thumbnail' => $this->thumbnail,
+            'skills' => $this->relationLoaded('skills')
+                ? $this->skills->map(fn ($skill) => [
+                    'id' => $skill->id,
+                    'name' => $skill->name,
+                    'slug' => $skill->slug,
+                ])->values()
+                : [],
             'status' => $this->status,
             'requirements' => $this->requirements,
             'outcomes' => $this->outcomes,
@@ -70,6 +73,8 @@ class CourseCurriculumResource extends JsonResource
                                     'is_active' => $quiz->is_active,
                                     'is_random' => $quiz->is_random,
                                     'max_attempts' => $quiz->max_attempts,
+                                    'open_at' => $quiz->open_at?->format('Y-m-d H:i:s'),
+                                    'close_at' => $quiz->close_at?->format('Y-m-d H:i:s'),
                                     'created_at' => $quiz->created_at?->format('Y-m-d H:i:s'),
                                     'updated_at' => $quiz->updated_at?->format('Y-m-d H:i:s'),
                                 ];

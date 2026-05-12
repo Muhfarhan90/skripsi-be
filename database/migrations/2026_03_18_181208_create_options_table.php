@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('options', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('question_id')->index();
+            $table->foreignId('question_id')->constrained('questions')->onDelete('cascade');
             $table->string('option_text');
             $table->string('image_url')->nullable();
             $table->boolean('is_correct')->nullable()->default(false);

@@ -7,8 +7,10 @@ use App\Http\Resources\CourseCurriculumResource;
 use App\Http\Resources\EnrollmentResource;
 use App\Http\Resources\LessonResource;
 use App\Http\Resources\LessonProgressResource;
+use App\Models\Course;
 use App\Services\EnrollmentService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class EnrollmentController extends Controller
 {
@@ -50,7 +52,16 @@ class EnrollmentController extends Controller
     public function curriculum(Request $request, string $id)
     {
         $enrollment = $this->service->findByIdForUser((int) $request->user()->id, (int) $id);
-        $course = $enrollment->course()
+        $this->service->assertCanReadMaterial($enrollment);
+        $enrollment->loadMissing('courseOffering');
+        $courseId = $enrollment->courseOffering?->course_id;
+        if (! $courseId) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Enrollment is missing a valid course offering reference.'],
+            ]);
+        }
+
+        $course = Course::query()
             ->with([
                 'category:id,name',
                 'instructor:id,fullname',
@@ -58,7 +69,7 @@ class EnrollmentController extends Controller
                 'sections.lessons' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
                 'sections.quizzes' => fn ($query) => $query->orderByDesc('id'),
             ])
-            ->firstOrFail();
+            ->findOrFail($courseId);
 
         return response()->json([
             'success' => true,

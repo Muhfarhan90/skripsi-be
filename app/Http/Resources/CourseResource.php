@@ -23,12 +23,14 @@ class CourseResource extends JsonResource
             'category_name' => $this->relationLoaded('category') ? $this->category?->name : null,
             'instructor_id' => $this->instructor_id,
             'instructor_name' => $this->relationLoaded('instructor') ? $this->instructor?->fullname : null,
-            'price' => $this->price !== null ? (float) $this->price : null,
-            'discount_price' => $this->discount_price !== null && (float) $this->discount_price > 0
-                ? (float) $this->discount_price
-                : null,
             'thumbnail' => $this->thumbnail,
-            'status' => $this->status,
+            'skills' => $this->relationLoaded('skills')
+                ? $this->skills->map(fn ($skill) => [
+                    'id' => $skill->id,
+                    'name' => $skill->name,
+                    'slug' => $skill->slug,
+                ])->values()
+                : [],
             'requirements' => $this->requirements,
             'outcomes' => $this->outcomes,
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),

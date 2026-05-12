@@ -14,9 +14,14 @@ return new class extends Migration
         Schema::create('order_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')->constrained()->onDelete('cascade');
-            $table->foreignId('course_id')->constrained()->onDelete('cascade');
+            $table->foreignId('course_offering_id')
+                ->nullable()
+                ->constrained('course_offerings')
+                ->nullOnDelete();
             $table->decimal('price', 10, 2);
             $table->timestamps();
+
+            $table->index('course_offering_id');
         });
     }
 

@@ -23,6 +23,8 @@ return new class extends Migration
             $table->boolean('is_active')->nullable()->default(true);
             $table->boolean('is_random')->nullable()->default(false);
             $table->integer('max_attempts')->nullable()->default(0); // 0 for unlimited
+            $table->timestamp('open_at')->nullable();
+            $table->timestamp('close_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

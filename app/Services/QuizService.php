@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Course;
 use App\Models\Quiz;
 use App\Models\Section;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -59,6 +60,7 @@ class QuizService
     {
         return DB::transaction(function () use ($courseId, $sectionId, $data) {
             $this->ensureSectionBelongsToCourse($courseId, $sectionId);
+            $this->assertQuizWindowRange($data);
 
             $quizData = array_merge($data, [
                 'course_id' => $courseId,
@@ -77,6 +79,10 @@ class QuizService
             $nextSectionId = isset($data['section_id']) ? (int) $data['section_id'] : (int) $quiz->section_id;
 
             $this->ensureSectionBelongsToCourse($nextCourseId, $nextSectionId);
+            $this->assertQuizWindowRange(array_merge([
+                'open_at' => $quiz->open_at?->format('Y-m-d H:i:s'),
+                'close_at' => $quiz->close_at?->format('Y-m-d H:i:s'),
+            ], $data));
 
             $quiz->update($data);
             return $quiz->refresh();
@@ -91,6 +97,10 @@ class QuizService
                 ->firstOrFail();
 
             $this->ensureSectionBelongsToCourse($courseId, $sectionId);
+            $this->assertQuizWindowRange(array_merge([
+                'open_at' => $quiz->open_at?->format('Y-m-d H:i:s'),
+                'close_at' => $quiz->close_at?->format('Y-m-d H:i:s'),
+            ], $data));
 
             $quiz->update(array_merge($data, [
                 'course_id' => $courseId,
@@ -148,5 +158,23 @@ class QuizService
         }
 
         return $section;
+    }
+
+    private function assertQuizWindowRange(array $data): void
+    {
+        $openAt = $data['open_at'] ?? null;
+        $closeAt = $data['close_at'] ?? null;
+
+        if (empty($openAt) || empty($closeAt)) {
+            return;
+        }
+
+        $open = Carbon::parse((string) $openAt);
+        $close = Carbon::parse((string) $closeAt);
+        if ($close->lt($open)) {
+            throw ValidationException::withMessages([
+                'close_at' => ['Quiz close_at must be greater than or equal to open_at.'],
+            ]);
+        }
     }
 }

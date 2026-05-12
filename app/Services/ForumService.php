@@ -11,6 +11,13 @@ use Illuminate\Validation\ValidationException;
 
 class ForumService
 {
+    protected EnrollmentService $enrollmentService;
+
+    public function __construct(EnrollmentService $enrollmentService)
+    {
+        $this->enrollmentService = $enrollmentService;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | STUDENT FUNCTIONS
@@ -274,16 +281,21 @@ class ForumService
      */
     private function ensureEnrolled(int $courseId, int $userId): void
     {
-        $isEnrolled = Enrollment::where('user_id', $userId)
-            ->where('course_id', $courseId)
+        $enrollment = Enrollment::where('user_id', $userId)
+            ->whereHas('courseOffering', function ($query) use ($courseId) {
+                $query->where('course_id', $courseId);
+            })
             ->whereIn('status', ['active', 'completed'])
-            ->exists();
+            ->latest('id')
+            ->first();
 
-        if (!$isEnrolled) {
+        if (!$enrollment) {
             throw ValidationException::withMessages([
                 'course_id' => ['You must be enrolled in this course to access the forum.'],
             ]);
         }
+
+        $this->enrollmentService->assertCanWriteLearning($enrollment);
     }
 
     /**

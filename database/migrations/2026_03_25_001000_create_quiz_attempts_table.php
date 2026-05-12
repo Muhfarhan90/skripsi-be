@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('quiz_attempts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('enrollment_id')->index();
-            $table->foreignId('quiz_id')->index();
+            $table->foreignId('enrollment_id')->constrained('enrollments')->onDelete('cascade');
+            $table->foreignId('quiz_id')->constrained('quizzes')->onDelete('cascade');
             $table->integer('total_score')->nullable()->default(0);
             $table->string('status')->nullable()->default('in_progress');
             $table->timestamp('started_at')->nullable();

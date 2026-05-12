@@ -2,10 +2,14 @@
 
 namespace App\Services;
 
-use App\Models\Transaction;
-use App\Models\Order;
+use App\Models\CourseOffering;
 use App\Models\Enrollment;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Transaction;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TransactionService
 {
@@ -21,7 +25,6 @@ class TransactionService
 
     public function create(array $data)
     {
-        // Generate Unique Invoice Code
         $data['invoice_code'] = $this->generateInvoiceCode();
 
         $data['status'] = $this->normalizeStatus($data['status'] ?? 'pending');
@@ -57,7 +60,6 @@ class TransactionService
 
             $transaction->update($data);
 
-            // If status changed to success (paid), activate order and enrollments
             if ($oldStatus !== 'success' && $transaction->status === 'success') {
                 $order = $transaction->order;
                 if ($order) {
@@ -65,23 +67,10 @@ class TransactionService
                         $order->update(['status' => 'completed']);
                     }
 
-                    $order->loadMissing('items');
-                    foreach ($order->items as $item) {
-                        Enrollment::updateOrCreate(
-                            [
-                                'user_id' => $order->user_id,
-                                'course_id' => $item->course_id,
-                            ],
-                            [
-                                'order_id' => $order->id,
-                                'status' => 'active',
-                            ]
-                        );
-                    }
+                    $this->activateOrderEnrollments($order);
                 }
 
-                // Sync paid_at
-                if (!$transaction->paid_at) {
+                if (! $transaction->paid_at) {
                     $transaction->update(['paid_at' => now()]);
                 }
             }
@@ -118,5 +107,76 @@ class TransactionService
         }
 
         return $normalized;
+    }
+
+    private function activateOrderEnrollments(Order $order): void
+    {
+        $order->loadMissing('items.courseOffering.course');
+
+        foreach ($order->items as $item) {
+            $offering = $this->resolveOfferingForOrderItem($item);
+
+            $startedAt = $offering->start_at ?? now();
+            $endedAt = $this->resolveEnrollmentEndAt($offering);
+            $status = $this->resolveEnrollmentStatus($startedAt, $endedAt);
+
+            $enrollment = Enrollment::firstOrNew([
+                'user_id' => $order->user_id,
+                'course_offering_id' => $offering->id,
+            ]);
+
+            $payload = [
+                'course_offering_id' => $offering->id,
+                'order_id' => $order->id,
+                'status' => $enrollment->status === 'completed' ? 'completed' : $status,
+                'started_at' => $startedAt,
+                'ended_at' => $endedAt,
+                'expired_at' => $endedAt,
+            ];
+
+            if ($enrollment->status === 'completed') {
+                $payload['completed_at'] = $enrollment->completed_at ?? now();
+            }
+
+            $enrollment->fill($payload);
+            $enrollment->save();
+        }
+    }
+
+    private function resolveOfferingForOrderItem(OrderItem $item): CourseOffering
+    {
+        if ($item->courseOffering) {
+            return $item->courseOffering;
+        }
+
+        if ($item->course_offering_id) {
+            return CourseOffering::with('course')->findOrFail((int) $item->course_offering_id);
+        }
+
+        throw ValidationException::withMessages([
+            'course_offering_id' => ['Order item is missing course offering reference'],
+        ]);
+    }
+
+    private function resolveEnrollmentEndAt(CourseOffering $offering): ?Carbon
+    {
+        if ($offering->end_at) {
+            return $offering->end_at;
+        }
+
+        return null;
+    }
+
+    private function resolveEnrollmentStatus(?Carbon $startedAt, ?Carbon $endedAt): string
+    {
+        $now = now();
+        if ($startedAt && $now->lt($startedAt)) {
+            return 'pending';
+        }
+        if ($endedAt && $now->gt($endedAt)) {
+            return 'expired';
+        }
+
+        return 'active';
     }
 }

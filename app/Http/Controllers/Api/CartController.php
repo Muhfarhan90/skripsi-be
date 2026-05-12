@@ -31,9 +31,23 @@ class CartController extends Controller
 
     public function addItem(AddCartItemRequest $request)
     {
+        $validated = $request->validated();
+        $offeringId = isset($validated['course_offering_id'])
+            ? (int) $validated['course_offering_id']
+            : null;
+        $courseId = isset($validated['course_id']) ? (int) $validated['course_id'] : null;
+
+        if ($offeringId === null && $courseId === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'course_offering_id or course_id is required',
+            ], 422);
+        }
+
         $cart = $this->service->addCourseToCart(
             (int) $request->user()->id,
-            (int) $request->validated()['course_id'],
+            $offeringId,
+            $courseId,
         );
 
         return response()->json([
@@ -43,11 +57,11 @@ class CartController extends Controller
         ], 201);
     }
 
-    public function removeItem(Request $request, string $courseId)
+    public function removeItem(Request $request, string $itemId)
     {
         $cart = $this->service->removeCourseFromCart(
             (int) $request->user()->id,
-            (int) $courseId,
+            (int) $itemId,
         );
 
         return response()->json([

@@ -68,6 +68,8 @@ class QuizController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'is_random' => ['nullable', 'boolean'],
             'max_attempts' => ['nullable', 'integer', 'min:0'],
+            'open_at' => ['nullable', 'date'],
+            'close_at' => ['nullable', 'date'],
         ]);
 
         $quiz = $this->service->createForCourseSection((int) $courseId, (int) $sectionId, $validated);
@@ -90,6 +92,8 @@ class QuizController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'is_random' => ['nullable', 'boolean'],
             'max_attempts' => ['nullable', 'integer', 'min:0'],
+            'open_at' => ['nullable', 'date'],
+            'close_at' => ['nullable', 'date'],
         ]);
 
         $quiz = $this->service->updateForCourseSection(

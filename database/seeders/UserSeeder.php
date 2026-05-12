@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class UserSeeder extends Seeder
@@ -13,6 +13,10 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        $adminRoleId = Role::where('name', 'admin')->value('id');
+        $instructorRoleId = Role::where('name', 'instructor')->value('id');
+        $studentRoleId = Role::where('name', 'user')->value('id');
+
         // Create admin user
         User::updateOrCreate(
             ['email' => 'admin@example.com'],
@@ -20,7 +24,7 @@ class UserSeeder extends Seeder
                 'fullname' => 'Admin User',
                 'password' => bcrypt('password'),
                 'email_verified_at' => now(),
-                'role_id' => 1, // Assuming role_id 1 is for admin
+                'role_id' => $adminRoleId,
             ]
         );
 
@@ -31,7 +35,7 @@ class UserSeeder extends Seeder
                 'fullname' => 'Instructor User',
                 'password' => bcrypt('password'),
                 'email_verified_at' => now(),
-                'role_id' => 2, // Assuming role_id 2 is for instructor
+                'role_id' => $instructorRoleId,
             ]
         );
 
@@ -42,7 +46,37 @@ class UserSeeder extends Seeder
                 'fullname' => 'Student User',
                 'password' => bcrypt('password'),
                 'email_verified_at' => now(),
-                'role_id' => 3, // Assuming role_id 3 is for student
+                'role_id' => $studentRoleId,
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'student.waiting@example.com'],
+            [
+                'fullname' => 'Student Waiting Start',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'role_id' => $studentRoleId,
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'student.expired@example.com'],
+            [
+                'fullname' => 'Student Expired Access',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'role_id' => $studentRoleId,
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'student.completed@example.com'],
+            [
+                'fullname' => 'Student Completed',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'role_id' => $studentRoleId,
             ]
         );
     }

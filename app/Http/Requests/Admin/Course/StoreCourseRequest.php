@@ -27,10 +27,7 @@ class StoreCourseRequest extends FormRequest
             'description' => 'nullable|string',
             'category_id' => 'required|exists:categories,id',
             'instructor_id' => 'required|exists:users,id',
-            'price' => 'nullable|numeric|min:0',
-            'discount_price' => 'nullable|numeric|min:0|lte:price',
             'thumbnail' => 'nullable|image|max:2048',
-            'status' => 'required|in:draft,published,archived',
             'requirements' => 'nullable|string',
             'outcomes' => 'nullable|string',
         ];

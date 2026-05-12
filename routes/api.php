@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\CategoryController;
+use App\Http\Controllers\Api\Admin\AcademicPeriodController;
+use App\Http\Controllers\Api\Admin\AssignmentController as AdminAssignmentController;
 use App\Http\Controllers\Api\Admin\CourseController;
+use App\Http\Controllers\Api\Admin\CourseOfferingController;
 use App\Http\Controllers\Api\Admin\EnrollmentController as AdminEnrollmentController;
 use App\Http\Controllers\Api\Admin\LessonController;
 use App\Http\Controllers\Api\Admin\LessonProgressController as AdminLessonProgressController;
@@ -19,6 +22,7 @@ use App\Http\Controllers\Api\Admin\ForumController as AdminForumController;
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CourseCatalogController;
+use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\ForumController;
 use App\Http\Controllers\Api\ReviewController;
@@ -61,6 +65,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/enrollments/{id}/progress-summary', [EnrollmentController::class, 'progressSummary']);
     Route::get('/enrollments/{id}/next-lesson', [EnrollmentController::class, 'nextLesson']);
     Route::post('/enrollments/{id}/complete', [EnrollmentController::class, 'complete']);
+
+    Route::get('/enrollments/{enrollmentId}/assignments', [AssignmentController::class, 'index']);
+    Route::get('/enrollments/{enrollmentId}/assignments/{assignmentId}', [AssignmentController::class, 'show']);
+    Route::post('/enrollments/{enrollmentId}/assignments/{assignmentId}/submit', [AssignmentController::class, 'submit']);
 
     Route::get('/enrollments/{enrollmentId}/lesson-progress', [LessonProgressController::class, 'index']);
     Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [LessonProgressController::class, 'show']);
@@ -126,6 +134,12 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::patch('/enrollments/{id}/status', [AdminEnrollmentController::class, 'updateStatus']);
     Route::post('/enrollments/{id}/sync-progress', [AdminEnrollmentController::class, 'syncProgress']);
 
+    Route::get('/courses/{courseId}/assignments', [AdminAssignmentController::class, 'indexByCourse']);
+    Route::post('/courses/{courseId}/assignments', [AdminAssignmentController::class, 'storeForCourse']);
+    Route::put('/courses/{courseId}/assignments/{assignmentId}', [AdminAssignmentController::class, 'updateForCourse']);
+    Route::get('/assignments/{assignmentId}/submissions', [AdminAssignmentController::class, 'submissions']);
+    Route::put('/assignment-submissions/{submissionId}/review', [AdminAssignmentController::class, 'reviewSubmission']);
+
     Route::get('/enrollments/{enrollmentId}/lesson-progress', [AdminLessonProgressController::class, 'index']);
     Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'show']);
     Route::put('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'upsert']);
@@ -160,3 +174,5 @@ Route::apiResource('admin/vouchers', VoucherController::class)->middleware(['aut
 Route::apiResource('admin/transactions', TransactionController::class)->middleware(['auth:sanctum', 'admin']);
 Route::apiResource('admin/users', UserController::class)->middleware(['auth:sanctum', 'admin']);
 Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/academic-periods', AcademicPeriodController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/course-offerings', CourseOfferingController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);

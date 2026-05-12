@@ -97,7 +97,9 @@ class ReviewService
     private function ensureCanReview(int $courseId, int $userId): Enrollment
     {
         $enrollment = Enrollment::where('user_id', $userId)
-            ->where('course_id', $courseId)
+            ->whereHas('courseOffering', function ($query) use ($courseId) {
+                $query->where('course_id', $courseId);
+            })
             ->where('status', 'completed')
             ->first();
 

@@ -15,20 +15,10 @@ class Course extends Model
         'description',
         'category_id',
         'instructor_id',
-        'price',
-        'discount_price',
         'thumbnail',
-        'status',
         'total_duration',
         'requirements',
         'outcomes',
-        'total_students',
-        'rating'
-    ];
-
-    protected $casts = [
-        'price' => 'float',
-        'discount_price' => 'float',
     ];
 
     public function category()
@@ -53,7 +43,24 @@ class Course extends Model
 
     public function enrollments()
     {
-        return $this->hasMany(Enrollment::class);
+        return $this->hasManyThrough(
+            Enrollment::class,
+            CourseOffering::class,
+            'course_id',
+            'course_offering_id',
+            'id',
+            'id'
+        );
+    }
+
+    public function courseOfferings()
+    {
+        return $this->hasMany(CourseOffering::class);
+    }
+
+    public function assignments()
+    {
+        return $this->hasMany(Assignment::class);
     }
 
     public function reviews()
@@ -64,5 +71,14 @@ class Course extends Model
     public function certificates()
     {
         return $this->hasMany(Certificate::class);
+    }
+
+    public function skills()
+    {
+        return $this->belongsToMany(Skill::class, 'course_skills')
+            ->withPivot('sort_order')
+            ->withTimestamps()
+            ->orderBy('course_skills.sort_order')
+            ->orderBy('skills.name');
     }
 }

@@ -2,9 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\Enrollment;
+use App\Models\CourseOffering;
 use App\Models\Order;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class OrderSeeder extends Seeder
@@ -14,67 +15,116 @@ class OrderSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Data Order Pertama (Sudah Lunas)
-        $order1 = Order::create([
-            'user_id' => 1,
-            'order_code' => 'ORD-20240330-PAYMENT01',
-            'subtotal' => 500000,
-            'discount' => 0,
-            'tax' => 0,
-            'admin_fee' => 0,
-            'grand_total' => 500000,
-            'status' => 'completed',
-        ]);
+        $studentIds = User::query()->pluck('id', 'email');
+        $offeringByTitle = CourseOffering::query()->get()->keyBy('title');
 
-        $order1->items()->create([
-            'course_id' => 1,
-            'price' => 500000,
-        ]);
+        $orders = [
+            [
+                'order_code' => 'ORD-20260509-ACTIVE',
+                'invoice_code' => 'INV-20260509-ACTIVE',
+                'student_email' => 'student@example.com',
+                'offering_title' => 'Intro Programming - Cohort A1 2026',
+                'status' => 'completed',
+                'payment_method' => 'Bank Transfer',
+                'payment_channel' => 'BCA',
+                'transaction_status' => 'success',
+                'paid_at' => now()->subDays(5),
+                'expired_at' => null,
+            ],
+            [
+                'order_code' => 'ORD-20260509-WAITING',
+                'invoice_code' => 'INV-20260509-WAITING',
+                'student_email' => 'student.waiting@example.com',
+                'offering_title' => 'Advanced Web Dev - Cohort B1 2026',
+                'status' => 'completed',
+                'payment_method' => 'Virtual Account',
+                'payment_channel' => 'Mandiri',
+                'transaction_status' => 'success',
+                'paid_at' => now()->subDays(2),
+                'expired_at' => null,
+            ],
+            [
+                'order_code' => 'ORD-20260509-EXPIRED',
+                'invoice_code' => 'INV-20260509-EXPIRED',
+                'student_email' => 'student.expired@example.com',
+                'offering_title' => 'Health Wellness - Cohort Legacy 2025',
+                'status' => 'completed',
+                'payment_method' => 'Bank Transfer',
+                'payment_channel' => 'BNI',
+                'transaction_status' => 'success',
+                'paid_at' => now()->subMonths(5),
+                'expired_at' => null,
+            ],
+            [
+                'order_code' => 'ORD-20260509-COMPLETE',
+                'invoice_code' => 'INV-20260509-COMPLETE',
+                'student_email' => 'student.completed@example.com',
+                'offering_title' => 'Intro Programming - Cohort Legacy 2025',
+                'status' => 'completed',
+                'payment_method' => 'Bank Transfer',
+                'payment_channel' => 'BRI',
+                'transaction_status' => 'success',
+                'paid_at' => now()->subMonths(4),
+                'expired_at' => null,
+            ],
+            [
+                'order_code' => 'ORD-20260509-PENDING',
+                'invoice_code' => 'INV-20260509-PENDING',
+                'student_email' => 'student@example.com',
+                'offering_title' => 'Advanced Web Dev - Cohort B1 2026',
+                'status' => 'pending',
+                'payment_method' => 'Virtual Account',
+                'payment_channel' => 'Permata',
+                'transaction_status' => 'pending',
+                'paid_at' => null,
+                'expired_at' => now()->addDay(),
+            ],
+        ];
 
-        Enrollment::create([
-            'user_id' => 1,
-            'course_id' => 1,
-            'order_id' => $order1->id,
-            'status' => 'active',
-        ]);
+        foreach ($orders as $seed) {
+            $userId = $studentIds->get($seed['student_email']);
+            $offering = $offeringByTitle->get($seed['offering_title']);
 
-        Transaction::create([
-            'order_id' => $order1->id,
-            'invoice_code' => 'INV-20240330-SUCCESS01',
-            'payment_method' => 'Bank Transfer',
-            'payment_channel' => 'BCA',
-            'amount' => 500000,
-            'status' => 'success',
-            'paid_at' => now(),
-        ]);
+            if (! $userId || ! $offering) {
+                continue;
+            }
 
-        // 2. Data Order Kedua (Masih Pending / Belum Bayar)
-        $order2 = Order::create([
-            'user_id' => 1,
-            'order_code' => 'ORD-20240330-PENDING02',
-            'subtotal' => 750000,
-            'discount' => 0,
-            'tax' => 0,
-            'admin_fee' => 0,
-            'grand_total' => 750000,
-            'status' => 'pending',
-        ]);
+            $rawPrice = $offering->discount_price ?? $offering->price ?? 0;
+            $price = (float) $rawPrice;
 
-        $order2->items()->create([
-            'course_id' => 2,
-            'price' => 750000,
-        ]);
+            $order = Order::updateOrCreate(
+                ['order_code' => $seed['order_code']],
+                [
+                    'user_id' => $userId,
+                    'subtotal' => $price,
+                    'discount' => 0,
+                    'tax' => 0,
+                    'admin_fee' => 0,
+                    'grand_total' => $price,
+                    'status' => $seed['status'],
+                ]
+            );
 
-        // Enrollment TIDAK di create di awal jika status pending
+            $order->items()->updateOrCreate(
+                ['course_offering_id' => $offering->id],
+                [
+                    'course_offering_id' => $offering->id,
+                    'price' => $price,
+                ]
+            );
 
-        Transaction::create([
-            'order_id' => $order2->id,
-            'invoice_code' => 'INV-20240330-WAITING02',
-            'payment_method' => 'Virtual Account',
-            'payment_channel' => 'Mandiri',
-            'amount' => 750000,
-            'status' => 'pending',
-            'expired_at' => now()->addDay(),
-        ]);
+            Transaction::updateOrCreate(
+                ['invoice_code' => $seed['invoice_code']],
+                [
+                    'order_id' => $order->id,
+                    'payment_method' => $seed['payment_method'],
+                    'payment_channel' => $seed['payment_channel'],
+                    'amount' => $price,
+                    'status' => $seed['transaction_status'],
+                    'paid_at' => $seed['paid_at'],
+                    'expired_at' => $seed['expired_at'],
+                ]
+            );
+        }
     }
 }

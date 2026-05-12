@@ -13,9 +13,17 @@ use Illuminate\Validation\ValidationException;
 
 class QuizAttemptService
 {
+    protected EnrollmentService $enrollmentService;
+
+    public function __construct(EnrollmentService $enrollmentService)
+    {
+        $this->enrollmentService = $enrollmentService;
+    }
+
     public function getAttemptsByQuizForUser(int $userId, int $enrollmentId, int $quizId)
     {
-        $this->findEnrollmentForUser($userId, $enrollmentId);
+        $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
+        $this->enrollmentService->assertCanReadMaterial($enrollment);
         $this->findQuizForEnrollment($enrollmentId, $quizId, false);
 
         return QuizAttempt::where('enrollment_id', $enrollmentId)
@@ -27,7 +35,9 @@ class QuizAttemptService
     public function startAttemptForUser(int $userId, int $enrollmentId, int $quizId): QuizAttempt
     {
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
+        $this->enrollmentService->assertCanWriteLearning($enrollment);
         $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, false);
+        $this->assertQuizIsOpenForAttempt($quiz);
 
         $inProgress = QuizAttempt::where('enrollment_id', $enrollmentId)
             ->where('quiz_id', $quizId)
@@ -61,7 +71,8 @@ class QuizAttemptService
 
     public function findAttemptForUser(int $userId, int $enrollmentId, int $quizId, int $attemptId): QuizAttempt
     {
-        $this->findEnrollmentForUser($userId, $enrollmentId);
+        $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
+        $this->enrollmentService->assertCanReadMaterial($enrollment);
         $this->findQuizForEnrollment($enrollmentId, $quizId, true);
 
         return QuizAttempt::with('answers')
@@ -79,6 +90,10 @@ class QuizAttemptService
         int $questionId,
         array $data
     ): QuizAnswer {
+        $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
+        $this->enrollmentService->assertCanWriteLearning($enrollment);
+        $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, true);
+        $this->assertQuizIsOpenForAttempt($quiz);
         $attempt = $this->findAttemptForUser($userId, $enrollmentId, $quizId, $attemptId);
 
         if ($attempt->status !== 'in_progress') {
@@ -92,6 +107,10 @@ class QuizAttemptService
 
     public function submitAttemptForUser(int $userId, int $enrollmentId, int $quizId, int $attemptId): QuizAttempt
     {
+        $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
+        $this->enrollmentService->assertCanWriteLearning($enrollment);
+        $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, true);
+        $this->assertQuizIsOpenForAttempt($quiz);
         $attempt = $this->findAttemptForUser($userId, $enrollmentId, $quizId, $attemptId);
 
         if ($attempt->status !== 'in_progress') {
@@ -245,15 +264,38 @@ class QuizAttemptService
 
     private function findQuizForEnrollment(int $enrollmentId, int $quizId, bool $allowInactive): Quiz
     {
-        $enrollment = Enrollment::findOrFail($enrollmentId);
+        $enrollment = Enrollment::with('courseOffering')->findOrFail($enrollmentId);
+        $courseId = $enrollment->courseOffering?->course_id;
+        if (! $courseId) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Enrollment is missing a valid course offering reference.'],
+            ]);
+        }
 
         $query = Quiz::where('id', $quizId)
-            ->where('course_id', $enrollment->course_id);
+            ->where('course_id', $courseId);
 
         if (! $allowInactive) {
             $query->where('is_active', true);
         }
 
         return $query->firstOrFail();
+    }
+
+    private function assertQuizIsOpenForAttempt(Quiz $quiz): void
+    {
+        $now = now();
+
+        if ($quiz->open_at && $now->lt($quiz->open_at)) {
+            throw ValidationException::withMessages([
+                'quiz_id' => ['Quiz is not open yet. Please wait until the quiz open time.'],
+            ]);
+        }
+
+        if ($quiz->close_at && $now->gt($quiz->close_at)) {
+            throw ValidationException::withMessages([
+                'quiz_id' => ['Quiz has closed. New attempts or submissions are no longer allowed.'],
+            ]);
+        }
     }
 }

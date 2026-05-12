@@ -19,7 +19,16 @@ class Quiz extends Model
         'weight',
         'is_active',
         'is_random',
-        'max_attempts'
+        'max_attempts',
+        'open_at',
+        'close_at',
+    ];
+
+    protected $casts = [
+        'open_at' => 'datetime',
+        'close_at' => 'datetime',
+        'is_active' => 'boolean',
+        'is_random' => 'boolean',
     ];
 
     public function course()

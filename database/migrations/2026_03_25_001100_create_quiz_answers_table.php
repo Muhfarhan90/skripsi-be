@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::create('quiz_answers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('attempt_id')->index();
-            $table->foreignId('question_id')->index();
-            $table->foreignId('selected_option_id')->nullable()->index();
+            $table->foreignId('attempt_id')->constrained('quiz_attempts')->onDelete('cascade');
+            $table->foreignId('question_id')->constrained('questions')->onDelete('cascade');
+            $table->foreignId('selected_option_id')->nullable()->constrained('options')->nullOnDelete();
             $table->text('answer_text')->nullable();
             $table->boolean('is_correct')->nullable();
             $table->integer('score')->nullable()->default(0);

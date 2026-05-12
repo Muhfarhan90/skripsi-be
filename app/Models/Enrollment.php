@@ -8,17 +8,21 @@ class Enrollment extends Model
 {
     protected $fillable = [
         'user_id',
-        'course_id',
+        'course_offering_id',
         'order_id',
         'last_lesson_id',
         'progress',
         'status',
         'completed_at',
+        'started_at',
+        'ended_at',
         'expired_at',
     ];
 
     protected $casts = [
         'completed_at' => 'datetime',
+        'started_at' => 'datetime',
+        'ended_at' => 'datetime',
         'expired_at' => 'datetime',
     ];
 
@@ -27,9 +31,9 @@ class Enrollment extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function course()
+    public function courseOffering()
     {
-        return $this->belongsTo(Course::class);
+        return $this->belongsTo(CourseOffering::class);
     }
 
     public function order()
@@ -60,5 +64,10 @@ class Enrollment extends Model
     public function certificate()
     {
         return $this->hasOne(Certificate::class);
+    }
+
+    public function assignmentSubmissions()
+    {
+        return $this->hasMany(AssignmentSubmission::class);
     }
 }
