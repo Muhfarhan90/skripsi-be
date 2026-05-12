@@ -1,11 +1,11 @@
 meta {
-  name: DELETE cart items courseId
+  name: DELETE cart items courseOfferingId
   type: http
   seq: 100
 }
 
 delete {
-  url: {{baseUrl}}/cart/items/{{courseId}}
+  url: {{baseUrl}}/cart/items/{{courseOfferingId}}
   body: none
   auth: bearer
 }

@@ -1,0 +1,33 @@
+meta {
+  name: PUT admin assignment submissions submissionId review
+  type: http
+  seq: 149
+}
+
+put {
+  url: {{baseUrl}}/admin/assignment-submissions/{{submissionId}}/review
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "status": "approved",
+    "review_notes": "Submission meets the requirement."
+  }
+}
+
+docs {
+  URI: api/admin/assignment-submissions/{submissionId}/review
+  Action: App\Http\Controllers\Api\Admin\AssignmentController@reviewSubmission
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

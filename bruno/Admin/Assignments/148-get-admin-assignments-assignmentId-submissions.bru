@@ -1,0 +1,25 @@
+meta {
+  name: GET admin assignments assignmentId submissions
+  type: http
+  seq: 148
+}
+
+get {
+  url: {{baseUrl}}/admin/assignments/{{assignmentId}}/submissions
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/assignments/{assignmentId}/submissions
+  Action: App\Http\Controllers\Api\Admin\AssignmentController@submissions
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

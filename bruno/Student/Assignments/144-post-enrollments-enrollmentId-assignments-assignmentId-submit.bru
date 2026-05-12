@@ -1,0 +1,33 @@
+meta {
+  name: POST enrollments enrollmentId assignments assignmentId submit
+  type: http
+  seq: 144
+}
+
+post {
+  url: {{baseUrl}}/enrollments/{{enrollmentId}}/assignments/{{assignmentId}}/submit
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "submission_text": "Repository URL: https://github.com/example/project",
+    "attachment_url": "https://example.com/submissions/project.pdf"
+  }
+}
+
+docs {
+  URI: api/enrollments/{enrollmentId}/assignments/{assignmentId}/submit
+  Action: App\Http\Controllers\Api\AssignmentController@submit
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

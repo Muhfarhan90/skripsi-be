@@ -1,0 +1,40 @@
+meta {
+  name: POST admin courses courseId assignments
+  type: http
+  seq: 146
+}
+
+post {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/assignments
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "section_id": 1,
+    "title": "Final Project",
+    "description": "Build a simple CRUD application.",
+    "instructions": "Upload repository URL or deployment URL.",
+    "due_at": "2026-05-31 23:59:59",
+    "is_required_for_certificate": true,
+    "allow_resubmission": true,
+    "max_attempts": 3,
+    "status": "published"
+  }
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/assignments
+  Action: App\Http\Controllers\Api\Admin\AssignmentController@storeForCourse
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

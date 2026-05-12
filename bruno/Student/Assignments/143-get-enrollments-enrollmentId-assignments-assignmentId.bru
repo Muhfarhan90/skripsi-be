@@ -1,0 +1,25 @@
+meta {
+  name: GET enrollments enrollmentId assignments assignmentId
+  type: http
+  seq: 143
+}
+
+get {
+  url: {{baseUrl}}/enrollments/{{enrollmentId}}/assignments/{{assignmentId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/enrollments/{enrollmentId}/assignments/{assignmentId}
+  Action: App\Http\Controllers\Api\AssignmentController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

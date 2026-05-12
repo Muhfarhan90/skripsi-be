@@ -20,7 +20,15 @@ auth:bearer {
 }
 
 body:json {
-  {}
+  {
+    "user_id": 2,
+    "course_offering_ids": [
+      1
+    ],
+    "payment_method": "manual",
+    "status": "pending",
+    "voucher_code": ""
+  }
 }
 
 docs {

@@ -1,0 +1,25 @@
+meta {
+  name: GET enrollments id lessons lessonId
+  type: http
+  seq: 141
+}
+
+get {
+  url: {{baseUrl}}/enrollments/{{id}}/lessons/{{lessonId}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/enrollments/{id}/lessons/{lessonId}
+  Action: App\Http\Controllers\Api\EnrollmentController@lessonDetail
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+}

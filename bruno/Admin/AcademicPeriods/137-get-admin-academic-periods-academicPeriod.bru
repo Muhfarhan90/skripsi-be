@@ -1,0 +1,25 @@
+meta {
+  name: GET admin academic periods academicPeriod
+  type: http
+  seq: 137
+}
+
+get {
+  url: {{baseUrl}}/admin/academic-periods/{{academicPeriod}}
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/academic-periods/{academic_period}
+  Action: App\Http\Controllers\Api\Admin\AcademicPeriodController@show
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

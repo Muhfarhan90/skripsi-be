@@ -1,0 +1,38 @@
+meta {
+  name: PUT admin courses courseId assignments assignmentId
+  type: http
+  seq: 147
+}
+
+put {
+  url: {{baseUrl}}/admin/courses/{{courseId}}/assignments/{{assignmentId}}
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "title": "Final Project Revised",
+    "instructions": "Upload repository URL, deployment URL, and short demo video.",
+    "due_at": "2026-06-07 23:59:59",
+    "is_required_for_certificate": true,
+    "allow_resubmission": true,
+    "max_attempts": 5,
+    "status": "published"
+  }
+}
+
+docs {
+  URI: api/admin/courses/{courseId}/assignments/{assignmentId}
+  Action: App\Http\Controllers\Api\Admin\AssignmentController@updateForCourse
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}
