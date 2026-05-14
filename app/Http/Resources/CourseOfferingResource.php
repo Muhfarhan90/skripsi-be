@@ -17,14 +17,10 @@ class CourseOfferingResource extends JsonResource
             'course_id' => $this->course_id,
             'academic_period_id' => $this->academic_period_id,
             'title' => $this->title,
-            'start_at' => $this->start_at?->format('Y-m-d H:i:s'),
-            'end_at' => $this->end_at?->format('Y-m-d H:i:s'),
-            'enrollment_open_at' => $this->enrollment_open_at?->format('Y-m-d H:i:s'),
-            'enrollment_close_at' => $this->enrollment_close_at?->format('Y-m-d H:i:s'),
             'capacity' => $this->capacity,
             'price' => $this->price,
             'discount_price' => $this->discount_price,
-            'status' => $this->status,
+            'is_active' => (bool) $this->is_active,
             'enrollments_count' => isset($this->enrollments_count)
                 ? (int) $this->enrollments_count
                 : null,
@@ -38,6 +34,12 @@ class CourseOfferingResource extends JsonResource
                         'name' => $course->category->name,
                     ]
                     : null,
+                'instructor' => $course->relationLoaded('instructor') && $course->instructor
+                    ? [
+                        'id' => $course->instructor->id,
+                        'fullname' => $course->instructor->fullname,
+                    ]
+                    : null,
             ] : null,
             'academic_period' => $academicPeriod ? [
                 'id' => $academicPeriod->id,
@@ -47,8 +49,10 @@ class CourseOfferingResource extends JsonResource
                 'end_at' => $academicPeriod->end_at?->format('Y-m-d H:i:s'),
                 'enrollment_open_at' => $academicPeriod->enrollment_open_at?->format('Y-m-d H:i:s'),
                 'enrollment_close_at' => $academicPeriod->enrollment_close_at?->format('Y-m-d H:i:s'),
-                'status' => $academicPeriod->status,
+                'is_active' => (bool) $academicPeriod->is_active,
             ] : null,
+            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
+            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];
     }
 }

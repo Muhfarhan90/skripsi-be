@@ -27,6 +27,8 @@ class StoreCourseRequest extends FormRequest
             'description' => 'nullable|string',
             'category_id' => 'required|exists:categories,id',
             'instructor_id' => 'required|exists:users,id',
+            'skill_ids' => 'nullable|array',
+            'skill_ids.*' => 'integer|distinct|exists:skills,id',
             'thumbnail' => 'nullable|image|max:2048',
             'requirements' => 'nullable|string',
             'outcomes' => 'nullable|string',

@@ -10,23 +10,16 @@ class CourseOffering extends Model
         'course_id',
         'academic_period_id',
         'title',
-        'start_at',
-        'end_at',
-        'enrollment_open_at',
-        'enrollment_close_at',
         'capacity',
         'price',
         'discount_price',
-        'status',
+        'is_active',
     ];
 
     protected $casts = [
-        'start_at' => 'datetime',
-        'end_at' => 'datetime',
-        'enrollment_open_at' => 'datetime',
-        'enrollment_close_at' => 'datetime',
         'price' => 'float',
         'discount_price' => 'float',
+        'is_active' => 'boolean',
     ];
 
     public function course()

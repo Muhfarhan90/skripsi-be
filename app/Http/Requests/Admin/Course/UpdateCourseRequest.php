@@ -27,6 +27,8 @@ class UpdateCourseRequest extends FormRequest
             'description' => 'nullable|string',
             'category_id' => 'sometimes|required|exists:categories,id',
             'instructor_id' => 'sometimes|required|exists:users,id',
+            'skill_ids' => 'sometimes|array',
+            'skill_ids.*' => 'integer|distinct|exists:skills,id',
             'thumbnail' => 'nullable|image|max:2048',
             'requirements' => 'nullable|string',
             'outcomes' => 'nullable|string',

@@ -22,9 +22,10 @@ class CourseController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $course = $this->service->getAll();
+        $perPage = (int) $request->query('per_page', 10);
+        $course = $this->service->getAll($perPage);
         return response()->json([
             'success' => true,
             'message' => 'Courses retrieved successfully',

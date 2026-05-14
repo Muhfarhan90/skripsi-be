@@ -3,27 +3,26 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\CourseOffering\StoreCourseOfferingRequest;
+use App\Http\Requests\Admin\CourseOffering\UpdateCourseOfferingRequest;
 use App\Http\Resources\CourseOfferingResource;
 use App\Models\CourseOffering;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class CourseOfferingController extends Controller
 {
     public function index(Request $request)
     {
         $search = trim((string) $request->query('search', ''));
-        $status = strtolower(trim((string) $request->query('status', '')));
+        $isActive = $request->query('is_active');
         $periodId = (int) $request->query('academic_period_id', 0);
 
-        $offerings = CourseOffering::query()
-            ->with([
-                'course:id,title,slug,category_id',
-                'course.category:id,name',
-                'academicPeriod:id,code,name,start_at,end_at,enrollment_open_at,enrollment_close_at,status',
-            ])
+        $offerings = $this->indexQuery()
             ->withCount('enrollments')
-            ->when($status !== '' && $status !== 'all', function ($query) use ($status) {
-                $query->whereRaw('LOWER(status) = ?', [$status]);
+            ->when($isActive !== null && $isActive !== '' && $isActive !== 'all', function ($query) use ($isActive) {
+                $query->where('is_active', filter_var($isActive, FILTER_VALIDATE_BOOLEAN));
             })
             ->when($periodId > 0, function ($query) use ($periodId) {
                 $query->where('academic_period_id', $periodId);
@@ -40,9 +39,11 @@ class CourseOfferingController extends Controller
                         });
                 });
             })
-            ->orderByDesc('start_at')
-            ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->sortByDesc(function ($offering) {
+                return $offering->academicPeriod?->start_at?->getTimestamp() ?? 0;
+            })
+            ->values();
 
         return response()->json([
             'success' => true,
@@ -51,22 +52,80 @@ class CourseOfferingController extends Controller
         ]);
     }
 
+    public function store(StoreCourseOfferingRequest $request)
+    {
+        $offering = CourseOffering::create($request->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Course offering created successfully',
+            'data' => new CourseOfferingResource($this->detailQuery()->findOrFail($offering->id)),
+        ]);
+    }
+
     public function show(string $id)
     {
-        $offering = CourseOffering::query()
-            ->with([
-                'course:id,title,slug,category_id,instructor_id',
-                'course.category:id,name',
-                'course.instructor:id,fullname',
-                'academicPeriod:id,code,name,start_at,end_at,enrollment_open_at,enrollment_close_at,status',
-            ])
-            ->withCount('enrollments')
-            ->findOrFail((int) $id);
+        $offering = $this->detailQuery()->findOrFail((int) $id);
 
         return response()->json([
             'success' => true,
             'message' => 'Course offering retrieved successfully',
             'data' => new CourseOfferingResource($offering),
         ]);
+    }
+
+    public function update(UpdateCourseOfferingRequest $request, string $id)
+    {
+        $offering = CourseOffering::query()->findOrFail((int) $id);
+        $offering->update($request->validated());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Course offering updated successfully',
+            'data' => new CourseOfferingResource($this->detailQuery()->findOrFail($offering->id)),
+        ]);
+    }
+
+    public function destroy(string $id)
+    {
+        $offering = CourseOffering::query()
+            ->withCount(['enrollments', 'orderItems'])
+            ->findOrFail((int) $id);
+
+        if ((int) ($offering->enrollments_count ?? 0) > 0 || (int) ($offering->order_items_count ?? 0) > 0) {
+            throw ValidationException::withMessages([
+                'course_offering' => ['Course offering cannot be deleted because it is already referenced by enrollments or orders.'],
+            ]);
+        }
+
+        $offering->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Course offering deleted successfully',
+        ]);
+    }
+
+    private function indexQuery(): Builder
+    {
+        return CourseOffering::query()
+            ->with([
+                'course:id,title,slug,category_id,instructor_id',
+                'course.category:id,name',
+                'course.instructor:id,fullname',
+                'academicPeriod:id,code,name,start_at,end_at,enrollment_open_at,enrollment_close_at,is_active',
+            ]);
+    }
+
+    private function detailQuery(): Builder
+    {
+        return CourseOffering::query()
+            ->with([
+                'course:id,title,slug,category_id,instructor_id',
+                'course.category:id,name',
+                'course.instructor:id,fullname',
+                'academicPeriod:id,code,name,start_at,end_at,enrollment_open_at,enrollment_close_at,is_active',
+            ])
+            ->withCount('enrollments');
     }
 }

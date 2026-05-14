@@ -111,12 +111,12 @@ class TransactionService
 
     private function activateOrderEnrollments(Order $order): void
     {
-        $order->loadMissing('items.courseOffering.course');
+        $order->loadMissing('items.courseOffering.course', 'items.courseOffering.academicPeriod');
 
         foreach ($order->items as $item) {
             $offering = $this->resolveOfferingForOrderItem($item);
 
-            $startedAt = $offering->start_at ?? now();
+            $startedAt = $this->resolveEnrollmentStartAt($offering) ?? now();
             $endedAt = $this->resolveEnrollmentEndAt($offering);
             $status = $this->resolveEnrollmentStatus($startedAt, $endedAt);
 
@@ -150,7 +150,7 @@ class TransactionService
         }
 
         if ($item->course_offering_id) {
-            return CourseOffering::with('course')->findOrFail((int) $item->course_offering_id);
+            return CourseOffering::with(['course', 'academicPeriod'])->findOrFail((int) $item->course_offering_id);
         }
 
         throw ValidationException::withMessages([
@@ -160,11 +160,25 @@ class TransactionService
 
     private function resolveEnrollmentEndAt(CourseOffering $offering): ?Carbon
     {
-        if ($offering->end_at) {
-            return $offering->end_at;
+        return $this->resolveOfferingAcademicPeriod($offering)->end_at;
+    }
+
+    private function resolveEnrollmentStartAt(CourseOffering $offering): ?Carbon
+    {
+        return $this->resolveOfferingAcademicPeriod($offering)->start_at;
+    }
+
+    private function resolveOfferingAcademicPeriod(CourseOffering $offering)
+    {
+        $offering->loadMissing('academicPeriod');
+
+        if (! $offering->academicPeriod) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Offering does not have a valid academic period'],
+            ]);
         }
 
-        return null;
+        return $offering->academicPeriod;
     }
 
     private function resolveEnrollmentStatus(?Carbon $startedAt, ?Carbon $endedAt): string

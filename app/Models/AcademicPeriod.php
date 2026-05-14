@@ -13,7 +13,7 @@ class AcademicPeriod extends Model
         'end_at',
         'enrollment_open_at',
         'enrollment_close_at',
-        'status',
+        'is_active',
     ];
 
     protected $casts = [
@@ -21,6 +21,7 @@ class AcademicPeriod extends Model
         'end_at' => 'datetime',
         'enrollment_open_at' => 'datetime',
         'enrollment_close_at' => 'datetime',
+        'is_active' => 'boolean',
     ];
 
     public function courseOfferings()

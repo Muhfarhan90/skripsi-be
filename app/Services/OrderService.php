@@ -468,24 +468,26 @@ class OrderService
         $now = now();
 
         $offering = CourseOffering::query()
+            ->with('academicPeriod')
             ->where('course_id', $courseId)
-            ->where(function ($query) {
-                $query->whereNull('status')->orWhere('status', 'published');
+            ->where('is_active', true)
+            ->whereHas('academicPeriod', function ($query) use ($now) {
+                $query->where('is_active', true)
+                    ->where(function ($builder) use ($now) {
+                        $builder->whereNull('enrollment_open_at')->orWhere('enrollment_open_at', '<=', $now);
+                    })->where(function ($builder) use ($now) {
+                        $builder->whereNull('enrollment_close_at')->orWhere('enrollment_close_at', '>=', $now);
+                    });
             })
-            ->where(function ($query) use ($now) {
-                $query->whereNull('enrollment_open_at')->orWhere('enrollment_open_at', '<=', $now);
+            ->get()
+            ->sortBy(function (CourseOffering $offering) {
+                return $offering->academicPeriod?->start_at?->getTimestamp() ?? PHP_INT_MAX;
             })
-            ->where(function ($query) use ($now) {
-                $query->whereNull('enrollment_close_at')->orWhere('enrollment_close_at', '>=', $now);
-            })
-            ->orderByRaw('CASE WHEN start_at IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('start_at')
-            ->orderBy('id')
             ->first();
 
         if (! $offering) {
             throw ValidationException::withMessages([
-                'course_id' => ["No published offering is currently available for course ID: {$courseId}"],
+                'course_id' => ["No active offering is currently available for course ID: {$courseId}"],
             ]);
         }
 
@@ -499,7 +501,7 @@ class OrderService
         }
 
         if ($item->course_offering_id) {
-            return CourseOffering::with('course')->findOrFail((int) $item->course_offering_id);
+            return CourseOffering::with(['course', 'academicPeriod'])->findOrFail((int) $item->course_offering_id);
         }
 
         throw ValidationException::withMessages([
@@ -510,8 +512,9 @@ class OrderService
     private function ensureOfferingPurchasable(int $userId, int $offeringId, ?int $excludeOrderId = null): void
     {
         $now = now();
-        $offering = CourseOffering::with('course')->findOrFail($offeringId);
+        $offering = CourseOffering::with(['course', 'academicPeriod'])->findOrFail($offeringId);
         $course = $offering->course;
+        $academicPeriod = $this->resolveOfferingAcademicPeriod($offering);
 
         if (! $course) {
             throw ValidationException::withMessages([
@@ -519,19 +522,25 @@ class OrderService
             ]);
         }
 
-        if ($offering->status !== null && $offering->status !== 'published') {
+        if (! $offering->is_active) {
             throw ValidationException::withMessages([
                 'course_offering_id' => ['Course offering is not available for purchase'],
             ]);
         }
 
-        if ($offering->enrollment_open_at && $offering->enrollment_open_at->gt($now)) {
+        if (! $academicPeriod->is_active) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Academic period is not active for this offering'],
+            ]);
+        }
+
+        if ($academicPeriod->enrollment_open_at && $academicPeriod->enrollment_open_at->gt($now)) {
             throw ValidationException::withMessages([
                 'course_offering_id' => ['Enrollment window has not opened for this offering'],
             ]);
         }
 
-        if ($offering->enrollment_close_at && $offering->enrollment_close_at->lt($now)) {
+        if ($academicPeriod->enrollment_close_at && $academicPeriod->enrollment_close_at->lt($now)) {
             throw ValidationException::withMessages([
                 'course_offering_id' => ['Enrollment window is closed for this offering'],
             ]);
@@ -636,12 +645,12 @@ class OrderService
 
     public function activateOrderEnrollments(Order $order): void
     {
-        $order->loadMissing('items.courseOffering.course');
+        $order->loadMissing('items.courseOffering.course', 'items.courseOffering.academicPeriod');
 
         foreach ($order->items as $item) {
             $offering = $this->resolveOfferingForOrderItem($item);
 
-            $startedAt = $offering->start_at ?? now();
+            $startedAt = $this->resolveEnrollmentStartAt($offering) ?? now();
             $endedAt = $this->resolveEnrollmentEndAt($offering);
             $status = $this->resolveEnrollmentStatus($startedAt, $endedAt);
 
@@ -671,11 +680,25 @@ class OrderService
 
     private function resolveEnrollmentEndAt(CourseOffering $offering): ?Carbon
     {
-        if ($offering->end_at) {
-            return $offering->end_at;
+        return $this->resolveOfferingAcademicPeriod($offering)->end_at;
+    }
+
+    private function resolveEnrollmentStartAt(CourseOffering $offering): ?Carbon
+    {
+        return $this->resolveOfferingAcademicPeriod($offering)->start_at;
+    }
+
+    private function resolveOfferingAcademicPeriod(CourseOffering $offering)
+    {
+        $offering->loadMissing('academicPeriod');
+
+        if (! $offering->academicPeriod) {
+            throw ValidationException::withMessages([
+                'course_offering_id' => ['Offering does not have a valid academic period'],
+            ]);
         }
 
-        return null;
+        return $offering->academicPeriod;
     }
 
     private function resolveEnrollmentStatus(?Carbon $startedAt, ?Carbon $endedAt): string

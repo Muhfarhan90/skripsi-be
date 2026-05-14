@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\Admin\QuestionController;
 use App\Http\Controllers\Api\Admin\QuizController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SectionController;
+use App\Http\Controllers\Api\Admin\SkillController;
 use App\Http\Controllers\Api\Admin\TransactionController;
 use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\VoucherController;
@@ -164,6 +165,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
 });
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/skills', SkillController::class)->middleware(['auth:sanctum', 'admin']);
 Route::apiResource('admin/courses', CourseController::class)->middleware(['auth:sanctum', 'admin']);
 Route::apiResource('admin/sections', SectionController::class)->middleware(['auth:sanctum', 'admin']);
 Route::apiResource('admin/lessons', LessonController::class)->middleware(['auth:sanctum', 'admin']);
@@ -174,5 +176,5 @@ Route::apiResource('admin/vouchers', VoucherController::class)->middleware(['aut
 Route::apiResource('admin/transactions', TransactionController::class)->middleware(['auth:sanctum', 'admin']);
 Route::apiResource('admin/users', UserController::class)->middleware(['auth:sanctum', 'admin']);
 Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/academic-periods', AcademicPeriodController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/course-offerings', CourseOfferingController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/academic-periods', AcademicPeriodController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/course-offerings', CourseOfferingController::class)->middleware(['auth:sanctum', 'admin']);

@@ -22,7 +22,7 @@ class AcademicPeriodSeeder extends Seeder
                 'end_at' => $now->copy()->addMonths(4),
                 'enrollment_open_at' => $now->copy()->subMonths(3),
                 'enrollment_close_at' => $now->copy()->addMonth(),
-                'status' => 'active',
+                'is_active' => true,
             ],
             [
                 'code' => 'PRE-U-2026-B',
@@ -31,7 +31,7 @@ class AcademicPeriodSeeder extends Seeder
                 'end_at' => $now->copy()->addMonths(10),
                 'enrollment_open_at' => $now->copy()->addMonths(3),
                 'enrollment_close_at' => $now->copy()->addMonths(6),
-                'status' => 'planned',
+                'is_active' => false,
             ],
             [
                 'code' => 'PRE-U-2025-B',
@@ -40,7 +40,7 @@ class AcademicPeriodSeeder extends Seeder
                 'end_at' => $now->copy()->subMonths(8),
                 'enrollment_open_at' => $now->copy()->subMonths(16),
                 'enrollment_close_at' => $now->copy()->subMonths(12),
-                'status' => 'closed',
+                'is_active' => false,
             ],
         ];
 
@@ -52,4 +52,3 @@ class AcademicPeriodSeeder extends Seeder
         }
     }
 }
-

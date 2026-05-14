@@ -11,8 +11,10 @@ use Illuminate\Validation\ValidationException;
 
 class CourseService
 {
-    public function getAll()
+    public function getAll(int $perPage = 10)
     {
+        $safePerPage = $perPage > 0 ? min($perPage, 1000) : 10;
+
         return Course::query()
             ->with([
                 'category:id,name',
@@ -20,7 +22,7 @@ class CourseService
                 'skills:id,name,slug',
             ])
             ->latest()
-            ->paginate(10);
+            ->paginate($safePerPage);
     }
 
     public function getPublishedCatalog()
@@ -32,9 +34,10 @@ class CourseService
                 'skills:id,name,slug',
             ])
             ->whereHas('courseOfferings', function ($query) {
-                $query->where(function ($q) {
-                    $q->whereNull('status')->orWhere('status', 'published');
-                });
+                $query->where('is_active', true)
+                    ->whereHas('academicPeriod', function ($periodQuery) {
+                        $periodQuery->where('is_active', true);
+                    });
             })
             ->latest()
             ->paginate(12);
@@ -61,9 +64,10 @@ class CourseService
             ])
             ->where('slug', $slug)
             ->whereHas('courseOfferings', function ($query) {
-                $query->where(function ($q) {
-                    $q->whereNull('status')->orWhere('status', 'published');
-                });
+                $query->where('is_active', true)
+                    ->whereHas('academicPeriod', function ($periodQuery) {
+                        $periodQuery->where('is_active', true);
+                    });
             })
             ->firstOrFail();
     }
@@ -88,8 +92,12 @@ class CourseService
 
     public function create(array $data)
     {
+        $skillIds = $data['skill_ids'] ?? null;
+        unset($data['skill_ids']);
+
         $data['slug'] = Str::slug($data['title']);
         $course = Course::create($data);
+        $this->syncSkills($course, is_array($skillIds) ? $skillIds : null);
 
         return $course->load([
             'category:id,name',
@@ -101,16 +109,38 @@ class CourseService
     public function update(int $id, array $data)
     {
         $course = $this->findById($id);
+        $skillIds = $data['skill_ids'] ?? null;
+        unset($data['skill_ids']);
+
         if (isset($data['title'])) {
             $data['slug'] = Str::slug($data['title']);
         }
         $course->update($data);
+        $this->syncSkills($course, is_array($skillIds) ? $skillIds : null);
 
         return $course->load([
             'category:id,name',
             'instructor:id,fullname',
             'skills:id,name,slug',
         ]);
+    }
+
+    protected function syncSkills(Course $course, ?array $skillIds): void
+    {
+        if ($skillIds === null) {
+            return;
+        }
+
+        $syncPayload = collect($skillIds)
+            ->map(fn ($skillId) => (int) $skillId)
+            ->unique()
+            ->values()
+            ->mapWithKeys(fn ($skillId, $index) => [
+                $skillId => ['sort_order' => $index + 1],
+            ])
+            ->all();
+
+        $course->skills()->sync($syncPayload);
     }
 
     public function upsertCurriculum(int $courseId, array $data)

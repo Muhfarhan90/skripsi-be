@@ -18,6 +18,6 @@ class Skill extends Model
             ->withPivot('sort_order')
             ->withTimestamps()
             ->orderBy('course_skills.sort_order')
-            ->orderBy('skills.name');
+            ->orderBy('courses.title');
     }
 }
