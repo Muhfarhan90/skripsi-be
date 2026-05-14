@@ -13,7 +13,7 @@ uses(RefreshDatabase::class);
 
 function createSkillAdminUser(): User
 {
-    $role = Role::create(['name' => 'admin']);
+    $role = Role::unguarded(fn () => Role::query()->updateOrCreate(['id' => 1], ['name' => 'admin']));
 
     return User::factory()->create([
         'role_id' => $role->id,
