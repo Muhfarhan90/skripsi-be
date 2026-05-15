@@ -23,6 +23,8 @@ class UpsertCourseCurriculumRequest extends FormRequest
             'course.description' => ['nullable', 'string'],
             'course.category_id' => ['sometimes', 'exists:categories,id'],
             'course.instructor_id' => ['sometimes', 'exists:users,id'],
+            'course.skill_ids' => ['sometimes', 'array'],
+            'course.skill_ids.*' => ['integer', 'distinct', 'exists:skills,id'],
             'course.requirements' => ['nullable', 'string'],
             'course.outcomes' => ['nullable', 'string'],
 

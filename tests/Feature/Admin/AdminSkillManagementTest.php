@@ -147,3 +147,57 @@ it('syncs multiple skills to a course in the selected order', function () {
         'sort_order' => 2,
     ]);
 });
+
+it('syncs selected skills when course master is saved through the curriculum endpoint', function () {
+    $admin = createSkillAdminUser();
+    Sanctum::actingAs($admin);
+
+    $category = createSkillCourseCategory('Curriculum Skill Category');
+
+    $skillA = Skill::create([
+        'name' => 'Analytical Thinking',
+        'slug' => 'analytical-thinking',
+        'is_active' => true,
+    ]);
+
+    $skillB = Skill::create([
+        'name' => 'Debugging',
+        'slug' => 'debugging',
+        'is_active' => true,
+    ]);
+
+    $course = Course::create([
+        'title' => 'Curriculum Save Course',
+        'slug' => 'curriculum-save-course',
+        'description' => 'Course description',
+        'category_id' => $category->id,
+        'instructor_id' => $admin->id,
+        'thumbnail' => null,
+        'total_duration' => 0,
+        'requirements' => null,
+        'outcomes' => null,
+    ]);
+
+    $response = $this->putJson("/api/admin/courses/{$course->id}/curriculum", [
+        'course' => [
+            'skill_ids' => [$skillB->id, $skillA->id],
+        ],
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.skills.0.id', $skillB->id)
+        ->assertJsonPath('data.skills.1.id', $skillA->id);
+
+    $this->assertDatabaseHas('course_skills', [
+        'course_id' => $course->id,
+        'skill_id' => $skillB->id,
+        'sort_order' => 1,
+    ]);
+
+    $this->assertDatabaseHas('course_skills', [
+        'course_id' => $course->id,
+        'skill_id' => $skillA->id,
+        'sort_order' => 2,
+    ]);
+});
