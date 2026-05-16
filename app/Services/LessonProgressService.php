@@ -57,6 +57,7 @@ class LessonProgressService
     {
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
         $this->enrollmentService->assertCanWriteLearning($enrollment);
+        $this->enrollmentService->assertLessonUnlockedForEnrollment($enrollment, $lessonId);
 
         return $this->persistProgress($enrollment, $lessonId, $data);
     }

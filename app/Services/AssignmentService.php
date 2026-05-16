@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Models\Course;
+use App\Models\CourseOffering;
 use App\Models\Enrollment;
 use App\Models\Section;
 use App\Models\User;
@@ -22,6 +23,7 @@ class AssignmentService
             ->where('course_id', $courseId)
             ->where('status', 'published')
             ->with([
+                'section:id,course_id,title',
                 'submissions' => function ($query) use ($enrollment) {
                     $query->where('enrollment_id', $enrollment->id)
                         ->with('reviewer:id,fullname');
@@ -53,6 +55,7 @@ class AssignmentService
             ->where('course_id', $courseId)
             ->where('status', 'published')
             ->with([
+                'section:id,course_id,title',
                 'submissions' => function ($query) use ($enrollment) {
                     $query->where('enrollment_id', $enrollment->id)
                         ->with('reviewer:id,fullname')
@@ -213,6 +216,49 @@ class AssignmentService
             ->orderByDesc('attempt_no')
             ->orderByDesc('id')
             ->paginate(20);
+    }
+
+    public function getSubmissionsByOfferingForAdmin(int $offeringId, array $filters = [])
+    {
+        $perPage = max((int) ($filters['per_page'] ?? 10), 1);
+        $assignmentId = (int) ($filters['assignment_id'] ?? 0);
+        $status = trim((string) ($filters['status'] ?? ''));
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        CourseOffering::query()->findOrFail($offeringId);
+
+        return AssignmentSubmission::query()
+            ->whereHas('enrollment', function ($query) use ($offeringId) {
+                $query->where('course_offering_id', $offeringId);
+            })
+            ->when($assignmentId > 0, function ($query) use ($assignmentId) {
+                $query->where('assignment_id', $assignmentId);
+            })
+            ->when($status !== '' && $status !== 'all', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('submission_text', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($userQuery) use ($search) {
+                            $userQuery->where('fullname', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('assignment', function ($assignmentQuery) use ($search) {
+                            $assignmentQuery->where('title', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->with([
+                'assignment:id,section_id,title',
+                'assignment.section:id,course_id,title',
+                'user:id,fullname,email',
+                'reviewer:id,fullname',
+                'enrollment:id,user_id,course_offering_id,status,progress',
+            ])
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('id')
+            ->paginate($perPage);
     }
 
     public function reviewSubmissionForAdmin(int $submissionId, User $actor, array $data): AssignmentSubmission

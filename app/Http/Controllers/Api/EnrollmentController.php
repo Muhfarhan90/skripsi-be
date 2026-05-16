@@ -69,6 +69,10 @@ class EnrollmentController extends Controller
                 'sections' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
                 'sections.lessons' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
                 'sections.quizzes' => fn ($query) => $query->orderByDesc('id'),
+                'sections.assignments' => fn ($query) => $query
+                    ->where('status', 'published')
+                    ->orderBy('due_at')
+                    ->orderBy('id'),
             ])
             ->findOrFail($courseId);
 

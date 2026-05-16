@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Certificate;
-use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Lesson;
 use App\Models\LessonProgress;
@@ -25,26 +24,49 @@ class EnrollmentService
 
     public function getAllByUser(int $userId)
     {
-        return Enrollment::with([
-            'courseOffering.course.category:id,name',
-            'courseOffering.course.instructor:id,fullname',
-            'courseOffering.academicPeriod',
-            'certificate',
-        ])->where('user_id', $userId)
-            ->latest()
-            ->paginate(10);
-    }
-
-    public function findByIdForUser(int $userId, int $id): Enrollment
-    {
-        return Enrollment::with([
+        $enrollments = Enrollment::with([
             'courseOffering.course.category:id,name',
             'courseOffering.course.instructor:id,fullname',
             'courseOffering.academicPeriod',
             'order',
             'certificate',
         ])->where('user_id', $userId)
+            ->where(function ($query) {
+                $query->whereNull('order_id')
+                    ->orWhereHas('order', function ($orderQuery) {
+                        $orderQuery->where('status', 'completed');
+                    });
+            })
+            ->latest()
+            ->paginate(10);
+
+        $enrollments->setCollection(
+            $enrollments->getCollection()->map(
+                fn (Enrollment $enrollment) => $this->normalizePaidEnrollmentAccess($enrollment)
+            )
+        );
+
+        return $enrollments;
+    }
+
+    public function findByIdForUser(int $userId, int $id): Enrollment
+    {
+        $enrollment = Enrollment::with([
+            'courseOffering.course.category:id,name',
+            'courseOffering.course.instructor:id,fullname',
+            'courseOffering.academicPeriod',
+            'order',
+            'certificate',
+        ])->where('user_id', $userId)
+            ->where(function ($query) {
+                $query->whereNull('order_id')
+                    ->orWhereHas('order', function ($orderQuery) {
+                        $orderQuery->where('status', 'completed');
+                    });
+            })
             ->findOrFail($id);
+
+        return $this->normalizePaidEnrollmentAccess($enrollment);
     }
 
     public function complete(int $userId, int $id): Enrollment
@@ -102,9 +124,9 @@ class EnrollmentService
             'progress' => $enrollment->progress,
             'status' => $enrollment->status,
             'has_certificate' => $this->hasCertificateForEnrollment($enrollment),
-            'completed_at' => $enrollment->completed_at?->format('Y-m-d H:i:s'),
-            'started_at' => $enrollment->started_at?->format('Y-m-d H:i:s'),
-            'ended_at' => $this->getEffectiveEndedAt($enrollment)?->format('Y-m-d H:i:s'),
+            'completed_at' => $enrollment->completed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'started_at' => $enrollment->started_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'ended_at' => $this->getEffectiveEndedAt($enrollment)?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'assignment_requirement' => $this->assignmentService->getCompletionRequirementSummary($enrollment),
         ];
     }
@@ -135,6 +157,7 @@ class EnrollmentService
         $enrollment = $this->findByIdForUser($userId, $enrollmentId);
         $this->assertCanReadMaterial($enrollment);
         $courseId = $this->resolveCourseId($enrollment);
+        $this->assertLessonUnlockedForEnrollment($enrollment, $lessonId);
 
         $lesson = Lesson::with('section')
             ->where('id', $lessonId)
@@ -218,6 +241,45 @@ class EnrollmentService
             ->paginate(10);
     }
 
+    public function getByCourseOfferingIdForAdmin(int $offeringId, int $perPage = 10, string $search = '')
+    {
+        $perPage = max($perPage, 1);
+
+        $enrollments = Enrollment::query()
+            ->with([
+                'user:id,fullname,email',
+                'certificate',
+            ])
+            ->where('course_offering_id', $offeringId)
+            ->where(function ($query) {
+                $query->whereNull('order_id')
+                    ->orWhereHas('order', function ($orderQuery) {
+                        $orderQuery->where('status', 'completed');
+                    });
+            })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('user', function ($userQuery) use ($search) {
+                    $userQuery->where('fullname', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('id')
+            ->paginate($perPage);
+
+        $enrollments->setCollection(
+            $enrollments->getCollection()->map(function (Enrollment $enrollment) {
+                $enrollment->setAttribute(
+                    'assignment_requirement',
+                    $this->assignmentService->getCompletionRequirementSummary($enrollment)
+                );
+
+                return $enrollment;
+            })
+        );
+
+        return $enrollments;
+    }
+
     public function updateStatusForAdmin(int $id, string $status): Enrollment
     {
         $enrollment = $this->findByIdForAdmin($id);
@@ -253,7 +315,8 @@ class EnrollmentService
 
     public function syncProgress(int $enrollmentId): Enrollment
     {
-        $enrollment = Enrollment::with('certificate')->findOrFail($enrollmentId);
+        $enrollment = Enrollment::with(['order', 'courseOffering.academicPeriod', 'certificate'])->findOrFail($enrollmentId);
+        $enrollment = $this->normalizePaidEnrollmentAccess($enrollment);
         $courseId = $this->resolveCourseId($enrollment);
 
         $totalLessons = Lesson::whereHas('section', function ($query) use ($courseId) {
@@ -316,6 +379,39 @@ class EnrollmentService
 
         throw ValidationException::withMessages([
             'enrollment_id' => ['Learning activity is not allowed outside the active enrollment period.'],
+        ]);
+    }
+
+    public function assertLessonUnlockedForEnrollment(Enrollment $enrollment, int $lessonId): void
+    {
+        $orderedLessonIds = $this->getOrderedLessonIdsForEnrollment($enrollment);
+        $targetIndex = array_search($lessonId, $orderedLessonIds, true);
+
+        if ($targetIndex === false) {
+            throw ValidationException::withMessages([
+                'lesson_id' => ['Lesson does not belong to the enrolled course'],
+            ]);
+        }
+
+        if ($targetIndex === 0) {
+            return;
+        }
+
+        $previousLessonIds = array_slice($orderedLessonIds, 0, $targetIndex);
+        $completedLessonIds = LessonProgress::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->whereIn('lesson_id', $previousLessonIds)
+            ->whereNotNull('completed_at')
+            ->pluck('lesson_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (count(array_diff($previousLessonIds, $completedLessonIds)) === 0) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'lesson_id' => ['Selesaikan lesson sebelumnya terlebih dahulu.'],
         ]);
     }
 
@@ -409,6 +505,63 @@ class EnrollmentService
         }
 
         return (int) $enrollment->courseOffering->course_id;
+    }
+
+    private function getOrderedLessonIdsForEnrollment(Enrollment $enrollment): array
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+
+        return Lesson::query()
+            ->select('lessons.id')
+            ->join('sections', 'sections.id', '=', 'lessons.section_id')
+            ->where('sections.course_id', $courseId)
+            ->orderBy('sections.sort_order')
+            ->orderBy('sections.id')
+            ->orderBy('lessons.sort_order')
+            ->orderBy('lessons.id')
+            ->pluck('lessons.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    private function normalizePaidEnrollmentAccess(Enrollment $enrollment): Enrollment
+    {
+        $enrollment->loadMissing(['order', 'courseOffering.academicPeriod', 'certificate']);
+
+        $order = $enrollment->order;
+        if (! $order || $order->status !== 'completed') {
+            return $enrollment;
+        }
+
+        $now = now();
+        $effectiveEndedAt = $this->getEffectiveEndedAt($enrollment);
+        $payload = [];
+
+        if (! $enrollment->started_at || $enrollment->started_at->gt($now)) {
+            $payload['started_at'] = $now;
+        }
+
+        if ($effectiveEndedAt && $now->gt($effectiveEndedAt)) {
+            if ($enrollment->status !== 'completed') {
+                $payload['status'] = 'expired';
+            }
+        } elseif (! in_array((string) $enrollment->status, ['active', 'completed'], true)) {
+            $payload['status'] = 'active';
+        }
+
+        if ($payload === []) {
+            return $enrollment;
+        }
+
+        $enrollment->update($payload);
+
+        return $enrollment->fresh([
+            'courseOffering.course.category:id,name',
+            'courseOffering.course.instructor:id,fullname',
+            'courseOffering.academicPeriod',
+            'order',
+            'certificate',
+        ]);
     }
 
     private function assertCompletionRequirementSatisfied(Enrollment $enrollment): void

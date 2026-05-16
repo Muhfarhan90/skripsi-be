@@ -106,6 +106,9 @@ class CourseService
             'sections.quizzes' => function ($query) {
                 $query->orderByDesc('id');
             },
+            'sections.assignments' => function ($query) {
+                $query->orderBy('due_at')->orderBy('id');
+            },
         ])->findOrFail($id);
     }
 

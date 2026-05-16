@@ -569,6 +569,12 @@ class OrderService
         if ($offering->capacity !== null && $offering->capacity > 0) {
             $enrolledCount = Enrollment::where('course_offering_id', $offering->id)
                 ->whereIn('status', ['pending', 'active', 'completed'])
+                ->where(function ($query) {
+                    $query->whereNull('order_id')
+                        ->orWhereHas('order', function ($orderQuery) {
+                            $orderQuery->where('status', 'completed');
+                        });
+                })
                 ->count();
 
             if ($enrolledCount >= $offering->capacity) {
@@ -596,6 +602,12 @@ class OrderService
                 $query->where('course_id', $course->id);
             })
             ->whereIn('status', ['pending', 'active'])
+            ->where(function ($query) {
+                $query->whereNull('order_id')
+                    ->orWhereHas('order', function ($orderQuery) {
+                        $orderQuery->where('status', 'completed');
+                    });
+            })
             ->where(function ($query) use ($now) {
                 $query->whereNull('ended_at')->orWhere('ended_at', '>=', $now);
             })
@@ -720,7 +732,7 @@ class OrderService
         foreach ($order->items as $item) {
             $offering = $this->resolveOfferingForOrderItem($item);
 
-            $startedAt = $this->resolveEnrollmentStartAt($offering) ?? now();
+            $startedAt = now();
             $endedAt = $this->resolveEnrollmentEndAt($offering);
             $status = $this->resolveEnrollmentStatus($startedAt, $endedAt);
 
@@ -751,11 +763,6 @@ class OrderService
     private function resolveEnrollmentEndAt(CourseOffering $offering): ?Carbon
     {
         return $this->resolveOfferingAcademicPeriod($offering)->end_at;
-    }
-
-    private function resolveEnrollmentStartAt(CourseOffering $offering): ?Carbon
-    {
-        return $this->resolveOfferingAcademicPeriod($offering)->start_at;
     }
 
     private function resolveOfferingAcademicPeriod(CourseOffering $offering)

@@ -116,7 +116,7 @@ class TransactionService
         foreach ($order->items as $item) {
             $offering = $this->resolveOfferingForOrderItem($item);
 
-            $startedAt = $this->resolveEnrollmentStartAt($offering) ?? now();
+            $startedAt = now();
             $endedAt = $this->resolveEnrollmentEndAt($offering);
             $status = $this->resolveEnrollmentStatus($startedAt, $endedAt);
 
@@ -161,11 +161,6 @@ class TransactionService
     private function resolveEnrollmentEndAt(CourseOffering $offering): ?Carbon
     {
         return $this->resolveOfferingAcademicPeriod($offering)->end_at;
-    }
-
-    private function resolveEnrollmentStartAt(CourseOffering $offering): ?Carbon
-    {
-        return $this->resolveOfferingAcademicPeriod($offering)->start_at;
     }
 
     private function resolveOfferingAcademicPeriod(CourseOffering $offering)
