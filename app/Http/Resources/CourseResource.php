@@ -14,6 +14,14 @@ class CourseResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $catalogOffering = $this->relationLoaded('courseOfferings')
+            ? $this->courseOfferings
+                ->sortBy(function ($offering) {
+                    return $offering->academicPeriod?->start_at?->getTimestamp() ?? PHP_INT_MAX;
+                })
+                ->first()
+            : null;
+
         return [
             'id' => $this->id,
             'title' => $this->title,
@@ -23,7 +31,11 @@ class CourseResource extends JsonResource
             'category_name' => $this->relationLoaded('category') ? $this->category?->name : null,
             'instructor_id' => $this->instructor_id,
             'instructor_name' => $this->relationLoaded('instructor') ? $this->instructor?->fullname : null,
+            'course_offering_id' => $catalogOffering?->id,
+            'price' => $catalogOffering?->price,
+            'discount_price' => $catalogOffering?->discount_price,
             'thumbnail' => $this->thumbnail,
+            'status' => $catalogOffering ? 'Tersedia' : 'Tidak tersedia',
             'skills' => $this->relationLoaded('skills')
                 ? $this->skills->map(fn ($skill) => [
                     'id' => $skill->id,

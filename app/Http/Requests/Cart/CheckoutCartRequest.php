@@ -16,6 +16,8 @@ class CheckoutCartRequest extends FormRequest
         return [
             'voucher_code' => ['nullable', 'string'],
             'note' => ['nullable', 'string'],
+            'payment_reference' => ['nullable', 'string', 'max:255'],
+            'payment_proof' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['required', 'string', 'in:manual'],
         ];
     }

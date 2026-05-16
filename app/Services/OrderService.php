@@ -188,6 +188,36 @@ class OrderService
         });
     }
 
+    public function applyVoucherToCart(int $userId, string $voucherCode): Order
+    {
+        return DB::transaction(function () use ($userId, $voucherCode) {
+            $cart = $this->lockCartForUser($userId, false);
+            if (! $cart) {
+                throw ValidationException::withMessages([
+                    'cart' => ['Cart is empty'],
+                ]);
+            }
+
+            $cart->load(['items.courseOffering.course', 'voucher']);
+            if ($cart->items->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'cart' => ['Cart is empty'],
+                ]);
+            }
+
+            $subtotal = $this->refreshCartItemPrices($cart, $userId);
+            $voucherPricing = $this->resolveVoucherPricing($voucherCode, $subtotal);
+
+            $cart->voucher_id = $voucherPricing['voucher_id'];
+            $cart->subtotal = $subtotal;
+            $cart->discount = $voucherPricing['discount'];
+            $cart->grand_total = max(0, $subtotal - $voucherPricing['discount']);
+            $cart->save();
+
+            return $this->freshOrderWithRelations($cart->id);
+        });
+    }
+
     public function checkoutCart(int $userId, array $data): Order
     {
         return DB::transaction(function () use ($userId, $data) {
@@ -198,45 +228,20 @@ class OrderService
                 ]);
             }
 
-            $cart->load(['items.courseOffering.course']);
+            $cart->load(['items.courseOffering.course', 'voucher']);
             if ($cart->items->isEmpty()) {
                 throw ValidationException::withMessages([
                     'cart' => ['Cart is empty'],
                 ]);
             }
 
-            $subtotal = 0;
-            foreach ($cart->items as $item) {
-                $offering = $this->resolveOfferingForOrderItem($item);
-                $this->ensureOfferingPurchasable($userId, $offering->id, (int) $cart->id);
-
-                $latestPrice = $this->resolveOfferingSellingPrice($offering);
-                if (
-                    (float) $item->price !== (float) $latestPrice
-                    || (int) ($item->course_offering_id ?? 0) !== (int) $offering->id
-                ) {
-                    $item->update([
-                        'course_offering_id' => $offering->id,
-                        'price' => $latestPrice,
-                    ]);
-                }
-                $subtotal += $latestPrice;
-            }
-
-            $discount = 0;
-            $voucherId = null;
-            if (! empty($data['voucher_code'])) {
-                $voucher = Voucher::where('code', $data['voucher_code'])->first();
-                if (! $voucher) {
-                    throw ValidationException::withMessages([
-                        'voucher_code' => ['Voucher code is invalid'],
-                    ]);
-                }
-
-                $discountData = $this->applyVoucher($voucher, $subtotal);
-                $discount = $discountData['discount'];
-                $voucherId = $voucher->id;
-            }
+            $subtotal = $this->refreshCartItemPrices($cart, $userId);
+            $voucherCode = array_key_exists('voucher_code', $data)
+                ? ($data['voucher_code'] ?? null)
+                : $cart->voucher?->code;
+            $voucherPricing = $this->resolveVoucherPricing($voucherCode, $subtotal);
+            $discount = $voucherPricing['discount'];
+            $voucherId = $voucherPricing['voucher_id'];
 
             $grandTotal = max(0, $subtotal - $discount);
 
@@ -253,6 +258,8 @@ class OrderService
                 'amount' => $cart->grand_total,
                 'status' => 'pending',
                 'payment_method' => $data['payment_method'] ?? 'manual',
+                'payment_reference' => $data['payment_reference'] ?? null,
+                'payment_proof' => $data['payment_proof'] ?? null,
                 'paid_at' => null,
             ]);
 
@@ -654,6 +661,56 @@ class OrderService
         $cart->subtotal = $subtotal;
         $cart->grand_total = $subtotal;
         $cart->save();
+    }
+
+    private function refreshCartItemPrices(Order $cart, int $userId): float
+    {
+        $subtotal = 0;
+
+        foreach ($cart->items as $item) {
+            $offering = $this->resolveOfferingForOrderItem($item);
+            $this->ensureOfferingPurchasable($userId, $offering->id, (int) $cart->id);
+
+            $latestPrice = $this->resolveOfferingSellingPrice($offering);
+            if (
+                (float) $item->price !== (float) $latestPrice
+                || (int) ($item->course_offering_id ?? 0) !== (int) $offering->id
+            ) {
+                $item->update([
+                    'course_offering_id' => $offering->id,
+                    'price' => $latestPrice,
+                ]);
+            }
+
+            $subtotal += $latestPrice;
+        }
+
+        return $subtotal;
+    }
+
+    private function resolveVoucherPricing(?string $voucherCode, float $subtotal): array
+    {
+        $normalizedVoucherCode = trim((string) $voucherCode);
+        if ($normalizedVoucherCode === '') {
+            return [
+                'voucher_id' => null,
+                'discount' => 0,
+            ];
+        }
+
+        $voucher = Voucher::where('code', $normalizedVoucherCode)->first();
+        if (! $voucher) {
+            throw ValidationException::withMessages([
+                'voucher_code' => ['Voucher code is invalid'],
+            ]);
+        }
+
+        $discountData = $this->applyVoucher($voucher, $subtotal);
+
+        return [
+            'voucher_id' => $voucher->id,
+            'discount' => $discountData['discount'],
+        ];
     }
 
     public function activateOrderEnrollments(Order $order): void

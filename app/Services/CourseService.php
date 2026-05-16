@@ -49,12 +49,13 @@ class CourseService
                 'category:id,name',
                 'instructor:id,fullname',
                 'skills:id,name,slug',
+                'courseOfferings' => function ($query) {
+                    $this->applyPublishedOfferingScope($query);
+                    $query->with('academicPeriod');
+                },
             ])
             ->whereHas('courseOfferings', function ($query) {
-                $query->where('is_active', true)
-                    ->whereHas('academicPeriod', function ($periodQuery) {
-                        $periodQuery->where('is_active', true);
-                    });
+                $this->applyPublishedOfferingScope($query);
             })
             ->latest()
             ->paginate(12);
@@ -78,13 +79,14 @@ class CourseService
                 'category:id,name',
                 'instructor:id,fullname',
                 'skills:id,name,slug',
+                'courseOfferings' => function ($query) {
+                    $this->applyPublishedOfferingScope($query);
+                    $query->with('academicPeriod');
+                },
             ])
             ->where('slug', $slug)
             ->whereHas('courseOfferings', function ($query) {
-                $query->where('is_active', true)
-                    ->whereHas('academicPeriod', function ($periodQuery) {
-                        $periodQuery->where('is_active', true);
-                    });
+                $this->applyPublishedOfferingScope($query);
             })
             ->firstOrFail();
     }
@@ -258,5 +260,23 @@ class CourseService
         $course->delete();
 
         return true;
+    }
+
+    private function applyPublishedOfferingScope($query): void
+    {
+        $now = now();
+
+        $query->where('is_active', true)
+            ->whereHas('academicPeriod', function ($periodQuery) use ($now) {
+                $periodQuery->where('is_active', true)
+                    ->where(function ($builder) use ($now) {
+                        $builder->whereNull('enrollment_open_at')
+                            ->orWhere('enrollment_open_at', '<=', $now);
+                    })
+                    ->where(function ($builder) use ($now) {
+                        $builder->whereNull('enrollment_close_at')
+                            ->orWhere('enrollment_close_at', '>=', $now);
+                    });
+            });
     }
 }
