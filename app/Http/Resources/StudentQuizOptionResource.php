@@ -5,18 +5,15 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class QuizAnswerResource extends JsonResource
+class StudentQuizOptionResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
-            'attempt_id' => $this->attempt_id,
             'question_id' => $this->question_id,
-            'selected_option_id' => $this->selected_option_id,
-            'answer_text' => $this->answer_text,
-            'is_correct' => $this->is_correct,
-            'score' => $this->score,
+            'option_text' => $this->option_text,
+            'image_url' => $this->image_url,
             'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];

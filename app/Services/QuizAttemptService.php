@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class QuizAttemptService
 {
+    private const RETAKE_COOLDOWN_MINUTES = 5;
+
     protected EnrollmentService $enrollmentService;
 
     public function __construct(EnrollmentService $enrollmentService)
@@ -24,7 +26,7 @@ class QuizAttemptService
     {
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
         $this->enrollmentService->assertCanReadMaterial($enrollment);
-        $this->findQuizForEnrollment($enrollmentId, $quizId, false);
+        $this->findQuizForEnrollment($enrollmentId, $quizId, true);
 
         return QuizAttempt::where('enrollment_id', $enrollmentId)
             ->where('quiz_id', $quizId)
@@ -49,6 +51,15 @@ class QuizAttemptService
                 'quiz_id' => ['There is already an in-progress attempt for this quiz'],
             ]);
         }
+
+        $latestCompletedAttempt = QuizAttempt::where('enrollment_id', $enrollmentId)
+            ->where('quiz_id', $quizId)
+            ->whereIn('status', ['submitted', 'graded'])
+            ->latest('submitted_at')
+            ->latest('id')
+            ->first();
+
+        $this->assertRetakeCooldownHasPassed($latestCompletedAttempt);
 
         $attemptCount = QuizAttempt::where('enrollment_id', $enrollmentId)
             ->where('quiz_id', $quizId)
@@ -101,6 +112,8 @@ class QuizAttemptService
                 'attempt_id' => ['Only in-progress attempt can be answered'],
             ]);
         }
+
+        $this->assertAttemptWithinDuration($attempt, $quiz);
 
         return $this->persistAnswer($attempt, $quizId, $questionId, $data);
     }
@@ -297,5 +310,48 @@ class QuizAttemptService
                 'quiz_id' => ['Quiz has closed. New attempts or submissions are no longer allowed.'],
             ]);
         }
+    }
+
+    private function assertAttemptWithinDuration(QuizAttempt $attempt, Quiz $quiz): void
+    {
+        $duration = (int) ($quiz->duration ?? 0);
+        if ($duration <= 0 || ! $attempt->started_at) {
+            return;
+        }
+
+        $deadline = $attempt->started_at->copy()->addMinutes($duration);
+        if (now()->lte($deadline)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'attempt_id' => ['Quiz time is over. Answers can no longer be changed.'],
+        ]);
+    }
+
+    private function assertRetakeCooldownHasPassed(?QuizAttempt $attempt): void
+    {
+        if (! $attempt) {
+            return;
+        }
+
+        $submittedAt = $attempt->submitted_at ?? $attempt->updated_at;
+        if (! $submittedAt) {
+            return;
+        }
+
+        $availableAt = $submittedAt->copy()->addMinutes(self::RETAKE_COOLDOWN_MINUTES);
+        if (now()->gte($availableAt)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'quiz_id' => [
+                sprintf(
+                    'Please wait until %s before starting a new attempt.',
+                    $availableAt->utc()->format('Y-m-d\TH:i:s\Z')
+                ),
+            ],
+        ]);
     }
 }

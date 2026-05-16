@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\Lesson;
 use App\Models\LessonProgress;
+use App\Models\Quiz;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -150,6 +151,39 @@ class EnrollmentService
             'enrollment' => $enrollment,
             'lesson' => $lesson,
             'progress' => $progress,
+        ];
+    }
+
+    public function findQuizDetailForUser(int $userId, int $enrollmentId, int $quizId): array
+    {
+        $enrollment = $this->findByIdForUser($userId, $enrollmentId);
+        $this->assertCanReadMaterial($enrollment);
+        $courseId = $this->resolveCourseId($enrollment);
+
+        $quiz = Quiz::query()
+            ->with([
+                'questions' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('id'),
+                'questions.options' => fn ($query) => $query->orderBy('id'),
+            ])
+            ->where('id', $quizId)
+            ->where('course_id', $courseId)
+            ->firstOrFail();
+
+        $unsupportedQuestionTypes = $quiz->questions
+            ->pluck('type')
+            ->filter(fn ($type) => ! in_array((string) $type, ['multiple_choice', 'true_false'], true))
+            ->unique()
+            ->values()
+            ->all();
+
+        return [
+            'enrollment' => $enrollment,
+            'quiz' => $quiz,
+            'is_supported' => count($unsupportedQuestionTypes) === 0,
+            'unsupported_question_types' => $unsupportedQuestionTypes,
         ];
     }
 

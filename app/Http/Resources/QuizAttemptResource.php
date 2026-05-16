@@ -15,11 +15,11 @@ class QuizAttemptResource extends JsonResource
             'quiz_id' => $this->quiz_id,
             'total_score' => $this->total_score,
             'status' => $this->status,
-            'started_at' => $this->started_at?->format('Y-m-d H:i:s'),
-            'submitted_at' => $this->submitted_at?->format('Y-m-d H:i:s'),
+            'started_at' => $this->started_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'submitted_at' => $this->submitted_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'answers' => QuizAnswerResource::collection($this->whenLoaded('answers')),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }
