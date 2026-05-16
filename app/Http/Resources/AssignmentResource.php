@@ -17,7 +17,7 @@ class AssignmentResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'instructions' => $this->instructions,
-            'due_at' => $this->due_at?->format('Y-m-d H:i:s'),
+            'due_at' => $this->due_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'is_required_for_certificate' => (bool) $this->is_required_for_certificate,
             'allow_resubmission' => (bool) $this->allow_resubmission,
             'max_attempts' => $this->max_attempts,
@@ -36,8 +36,8 @@ class AssignmentResource extends JsonResource
             'submissions' => $this->whenLoaded('submissions', function () {
                 return AssignmentSubmissionResource::collection($this->submissions);
             }),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

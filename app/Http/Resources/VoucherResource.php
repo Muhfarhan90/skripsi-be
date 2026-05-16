@@ -18,9 +18,9 @@ class VoucherResource extends JsonResource
             'max_discount' => $this->max_discount,
             'usage_limit' => $this->usage_limit,
             'is_active' => $this->is_active,
-            'expired_at' => $this->expired_at?->format('Y-m-d H:i:s'),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'expired_at' => $this->expired_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

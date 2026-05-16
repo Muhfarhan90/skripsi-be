@@ -14,10 +14,10 @@ class LessonProgressResource extends JsonResource
             'enrollment_id' => $this->enrollment_id,
             'lesson_id' => $this->lesson_id,
             'progress_seconds' => $this->progress_seconds,
-            'last_accessed_at' => $this->last_accessed_at?->format('Y-m-d H:i:s'),
-            'completed_at' => $this->completed_at?->format('Y-m-d H:i:s'),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'last_accessed_at' => $this->last_accessed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'completed_at' => $this->completed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

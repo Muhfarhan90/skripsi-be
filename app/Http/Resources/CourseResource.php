@@ -45,7 +45,7 @@ class CourseResource extends JsonResource
                 : [],
             'requirements' => $this->requirements,
             'outcomes' => $this->outcomes,
-            'created_at' => $this->created_at->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

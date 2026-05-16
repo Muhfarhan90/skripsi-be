@@ -21,11 +21,11 @@ class TransactionResource extends JsonResource
             'payment_proof' => $this->payment_proof,
             'amount' => $this->amount,
             'status' => $this->status,
-            'paid_at' => $this->paid_at?->format('Y-m-d H:i:s'),
-            'expired_at' => $this->expired_at?->format('Y-m-d H:i:s'),
+            'paid_at' => $this->paid_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'expired_at' => $this->expired_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'verified_by' => $this->verified_by,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'order' => new OrderResource($this->whenLoaded('order')),
         ];
     }

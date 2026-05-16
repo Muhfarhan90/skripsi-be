@@ -15,10 +15,10 @@ class AcademicPeriodResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
-            'start_at' => $this->start_at?->format('Y-m-d H:i:s'),
-            'end_at' => $this->end_at?->format('Y-m-d H:i:s'),
-            'enrollment_open_at' => $this->enrollment_open_at?->format('Y-m-d H:i:s'),
-            'enrollment_close_at' => $this->enrollment_close_at?->format('Y-m-d H:i:s'),
+            'start_at' => $this->start_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'end_at' => $this->end_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'enrollment_open_at' => $this->enrollment_open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'enrollment_close_at' => $this->enrollment_close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'is_active' => (bool) $this->is_active,
             'course_offerings_count' => isset($this->course_offerings_count)
                 ? (int) $this->course_offerings_count
@@ -53,8 +53,8 @@ class AcademicPeriodResource extends JsonResource
                     ];
                 })->values()
                 : null,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

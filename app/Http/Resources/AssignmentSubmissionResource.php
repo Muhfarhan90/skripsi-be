@@ -21,10 +21,10 @@ class AssignmentSubmissionResource extends JsonResource
             'review_notes' => $this->review_notes,
             'reviewed_by' => $this->reviewed_by,
             'reviewer_name' => $this->relationLoaded('reviewer') ? $this->reviewer?->fullname : null,
-            'submitted_at' => $this->submitted_at?->format('Y-m-d H:i:s'),
-            'reviewed_at' => $this->reviewed_at?->format('Y-m-d H:i:s'),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'submitted_at' => $this->submitted_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'reviewed_at' => $this->reviewed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

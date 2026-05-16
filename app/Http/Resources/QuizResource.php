@@ -21,11 +21,11 @@ class QuizResource extends JsonResource
             'is_active' => $this->is_active,
             'is_random' => $this->is_random,
             'max_attempts' => $this->max_attempts,
-            'open_at' => $this->open_at?->format('Y-m-d H:i:s'),
-            'close_at' => $this->close_at?->format('Y-m-d H:i:s'),
+            'open_at' => $this->open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'close_at' => $this->close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'questions' => QuestionResource::collection($this->whenLoaded('questions')),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

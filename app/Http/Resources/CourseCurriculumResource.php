@@ -73,16 +73,41 @@ class CourseCurriculumResource extends JsonResource
                                     'is_active' => $quiz->is_active,
                                     'is_random' => $quiz->is_random,
                                     'max_attempts' => $quiz->max_attempts,
-                                    'open_at' => $quiz->open_at?->format('Y-m-d H:i:s'),
-                                    'close_at' => $quiz->close_at?->format('Y-m-d H:i:s'),
-                                    'created_at' => $quiz->created_at?->format('Y-m-d H:i:s'),
-                                    'updated_at' => $quiz->updated_at?->format('Y-m-d H:i:s'),
+                                    'open_at' => $quiz->open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                                    'close_at' => $quiz->close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                                    'created_at' => $quiz->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                                    'updated_at' => $quiz->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
                                 ];
                             }),
+                        'assignments' => $section->relationLoaded('assignments')
+                            ? $section->assignments
+                                ->sortBy(function ($assignment) {
+                                    return $assignment->due_at?->getTimestamp() ?? PHP_INT_MAX;
+                                })
+                                ->values()
+                                ->map(function ($assignment) {
+                                    return [
+                                        'id' => $assignment->id,
+                                        'course_id' => $assignment->course_id,
+                                        'section_id' => $assignment->section_id,
+                                        'created_by' => $assignment->created_by,
+                                        'title' => $assignment->title,
+                                        'description' => $assignment->description,
+                                        'instructions' => $assignment->instructions,
+                                        'due_at' => $assignment->due_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                                        'is_required_for_certificate' => (bool) $assignment->is_required_for_certificate,
+                                        'allow_resubmission' => (bool) $assignment->allow_resubmission,
+                                        'max_attempts' => $assignment->max_attempts,
+                                        'status' => $assignment->status,
+                                        'created_at' => $assignment->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                                        'updated_at' => $assignment->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                                    ];
+                                })
+                            : [],
                     ];
                 }),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

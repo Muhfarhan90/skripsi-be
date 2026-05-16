@@ -15,8 +15,8 @@ class OptionResource extends JsonResource
             'option_text' => $this->option_text,
             'image_url' => $this->image_url,
             'is_correct' => $this->is_correct,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

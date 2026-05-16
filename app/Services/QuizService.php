@@ -80,8 +80,8 @@ class QuizService
 
             $this->ensureSectionBelongsToCourse($nextCourseId, $nextSectionId);
             $this->assertQuizWindowRange(array_merge([
-                'open_at' => $quiz->open_at?->format('Y-m-d H:i:s'),
-                'close_at' => $quiz->close_at?->format('Y-m-d H:i:s'),
+                'open_at' => $quiz->open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                'close_at' => $quiz->close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             ], $data));
 
             $quiz->update($data);
@@ -98,8 +98,8 @@ class QuizService
 
             $this->ensureSectionBelongsToCourse($courseId, $sectionId);
             $this->assertQuizWindowRange(array_merge([
-                'open_at' => $quiz->open_at?->format('Y-m-d H:i:s'),
-                'close_at' => $quiz->close_at?->format('Y-m-d H:i:s'),
+                'open_at' => $quiz->open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                'close_at' => $quiz->close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             ], $data));
 
             $quiz->update(array_merge($data, [

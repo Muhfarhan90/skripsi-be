@@ -32,15 +32,15 @@ class EnrollmentResource extends JsonResource
             'status' => $this->status,
             'course' => $course ? new CourseResource($course) : null,
             'order' => new OrderResource($this->whenLoaded('order')),
-            'started_at' => $this->started_at?->format('Y-m-d H:i:s'),
-            'ended_at' => $this->ended_at?->format('Y-m-d H:i:s'),
-            'completed_at' => $this->completed_at?->format('Y-m-d H:i:s'),
-            'expired_at' => ($this->ended_at ?? $this->expired_at)?->format('Y-m-d H:i:s'),
+            'started_at' => $this->started_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'ended_at' => $this->ended_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'completed_at' => $this->completed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'expired_at' => ($this->ended_at ?? $this->expired_at)?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'has_certificate' => $this->relationLoaded('certificate')
                 ? $this->certificate !== null
                 : $this->certificate()->exists(),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }

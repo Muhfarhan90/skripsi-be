@@ -16,12 +16,12 @@ class CertificateResource extends JsonResource
             'enrollment_id' => $this->enrollment_id,
             'certificate_number' => $this->certificate_number,
             'certificate_url' => $this->certificate_url,
-            'issued_at' => $this->issued_at?->format('Y-m-d H:i:s'),
-            'expired_at' => $this->expired_at?->format('Y-m-d H:i:s'),
+            'issued_at' => $this->issued_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'expired_at' => $this->expired_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'user' => new UserResource($this->whenLoaded('user')),
             'course' => new CourseResource($this->whenLoaded('course')),
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
 }
