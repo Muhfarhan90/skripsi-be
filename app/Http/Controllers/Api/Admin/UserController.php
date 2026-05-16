@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\User\StoreUserRequest;
 use App\Http\Requests\Admin\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Services\UserService;
+use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
@@ -17,9 +18,11 @@ class UserController extends Controller
         $this->service = $userService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $user = $this->service->getAll();
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 10);
+        $user = $this->service->getAll($search, $perPage);
 
         return response()->json([
             'success' => true,
@@ -36,7 +39,7 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request)
     {
-        $user = $this->service->create($request->all());
+        $user = $this->service->create($request->validated());
 
         return response()->json([
             'success' => true,
@@ -58,7 +61,7 @@ class UserController extends Controller
 
     public function update(UpdateUserRequest $request, $id)
     {
-        $user = $this->service->update((int) $id, $request->all());
+        $user = $this->service->update((int) $id, $request->validated());
 
         return response()->json([
             'success' => true,

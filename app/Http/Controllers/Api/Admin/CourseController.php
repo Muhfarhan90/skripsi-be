@@ -25,7 +25,8 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         $perPage = (int) $request->query('per_page', 10);
-        $course = $this->service->getAll($perPage);
+        $search = trim((string) $request->query('search', ''));
+        $course = $this->service->getAll($perPage, $search);
         return response()->json([
             'success' => true,
             'message' => 'Courses retrieved successfully',

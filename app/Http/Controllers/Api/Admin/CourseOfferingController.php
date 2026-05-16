@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CourseOffering\StoreCourseOfferingRequest;
 use App\Http\Requests\Admin\CourseOffering\UpdateCourseOfferingRequest;
 use App\Http\Resources\CourseOfferingResource;
+use App\Models\AcademicPeriod;
 use App\Models\CourseOffering;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class CourseOfferingController extends Controller
         $search = trim((string) $request->query('search', ''));
         $isActive = $request->query('is_active');
         $periodId = (int) $request->query('academic_period_id', 0);
+        $perPage = max((int) $request->query('per_page', 10), 1);
 
         $offerings = $this->indexQuery()
             ->withCount('enrollments')
@@ -39,16 +41,25 @@ class CourseOfferingController extends Controller
                         });
                 });
             })
-            ->get()
-            ->sortByDesc(function ($offering) {
-                return $offering->academicPeriod?->start_at?->getTimestamp() ?? 0;
-            })
-            ->values();
+            ->orderByDesc(
+                AcademicPeriod::query()
+                    ->select('start_at')
+                    ->whereColumn('academic_periods.id', 'course_offerings.academic_period_id')
+                    ->limit(1)
+            )
+            ->orderByDesc('course_offerings.id')
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
             'message' => 'Course offerings retrieved successfully',
             'data' => CourseOfferingResource::collection($offerings),
+            'meta' => [
+                'current_page' => $offerings->currentPage(),
+                'last_page' => $offerings->lastPage(),
+                'per_page' => $offerings->perPage(),
+                'total' => $offerings->total(),
+            ],
         ]);
     }
 

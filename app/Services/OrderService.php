@@ -26,12 +26,25 @@ class OrderService
     |--------------------------------------------------------------------------
     */
 
-    public function getAllForAdmin()
+    public function getAllForAdmin(string $search = '', int $perPage = 10)
     {
-        return Order::with(['user', 'items.courseOffering.course', 'voucher', 'transactions'])
+        $perPage = max($perPage, 1);
+
+        return Order::query()
+            ->with(['user', 'items.courseOffering.course', 'voucher', 'transactions'])
             ->where('status', '!=', 'cart')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('order_code', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($userQuery) use ($search) {
+                            $userQuery->where('fullname', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->latest()
-            ->paginate(10);
+            ->paginate($perPage);
     }
 
     public function findByIdForAdmin(int $id)

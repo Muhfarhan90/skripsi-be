@@ -8,15 +8,21 @@ use Illuminate\Validation\ValidationException;
 
 class SkillService
 {
-    public function getAll(int $perPage = 10)
+    public function getAll(int $perPage = 10, string $search = '')
     {
-        $safePerPage = $perPage > 0 ? min($perPage, 1000) : 10;
+        $perPage = max($perPage, 1);
 
         return Skill::query()
             ->withCount('courses')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('name', 'like', "%{$search}%")
+                        ->orWhere('slug', 'like', "%{$search}%");
+                });
+            })
             ->orderByDesc('is_active')
             ->orderBy('name')
-            ->paginate($safePerPage);
+            ->paginate($perPage);
     }
 
     public function findById(int $id): Skill

@@ -17,9 +17,11 @@ class OrderController extends Controller
         $this->service = $orderService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $orders = $this->service->getAllForAdmin();
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 10);
+        $orders = $this->service->getAllForAdmin($search, $perPage);
         
         return response()->json([
             'success' => true,
@@ -36,20 +38,13 @@ class OrderController extends Controller
 
     public function store(StoreOrderRequest $request)
     {
-        try {
-            $order = $this->service->create($request->validated());
+        $order = $this->service->create($request->validated());
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Order and Enrollment created successfully by Admin',
-                'data' => new OrderResource($order),
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Order and Enrollment created successfully by Admin',
+            'data' => new OrderResource($order),
+        ], 201);
     }
 
     public function show(string $id)
@@ -59,17 +54,6 @@ class OrderController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Order details retrieved successfully',
-            'data' => new OrderResource($order),
-        ]);
-    }
-
-    public function update(Request $request, string $id)
-    {
-        $order = $this->service->update((int) $id, $request->all());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Order updated successfully',
             'data' => new OrderResource($order),
         ]);
     }

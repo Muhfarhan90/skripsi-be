@@ -11,9 +11,9 @@ use Illuminate\Validation\ValidationException;
 
 class CourseService
 {
-    public function getAll(int $perPage = 10)
+    public function getAll(int $perPage = 10, string $search = '')
     {
-        $safePerPage = $perPage > 0 ? min($perPage, 1000) : 10;
+        $perPage = max($perPage, 1);
 
         return Course::query()
             ->with([
@@ -21,8 +21,25 @@ class CourseService
                 'instructor:id,fullname',
                 'skills:id,name,slug',
             ])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('title', 'like', "%{$search}%")
+                        ->orWhere('slug', 'like', "%{$search}%")
+                        ->orWhereHas('category', function ($categoryQuery) use ($search) {
+                            $categoryQuery->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('instructor', function ($userQuery) use ($search) {
+                            $userQuery->where('fullname', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('skills', function ($skillQuery) use ($search) {
+                            $skillQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('slug', 'like', "%{$search}%");
+                        });
+                });
+            })
             ->latest()
-            ->paginate($safePerPage);
+            ->paginate($perPage);
     }
 
     public function getPublishedCatalog()

@@ -7,9 +7,26 @@ use Illuminate\Support\Facades\Hash;
 
 class UserService
 {
-    public function getAll()
+    public function getAll(string $search = '', int $perPage = 10)
     {
-        return User::with('role')->withCount('orders')->latest()->paginate(10);
+        $perPage = max($perPage, 1);
+
+        return User::query()
+            ->with('role')
+            ->withCount('orders')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('fullname', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('nisn', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhereHas('role', function ($roleQuery) use ($search) {
+                            $roleQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest()
+            ->paginate($perPage);
     }
 
     public function findById(int $id)

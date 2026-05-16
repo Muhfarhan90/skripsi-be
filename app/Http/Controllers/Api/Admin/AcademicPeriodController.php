@@ -17,6 +17,7 @@ class AcademicPeriodController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $isActive = $request->query('is_active');
+        $perPage = max((int) $request->query('per_page', 10), 1);
 
         $periods = $this->indexQuery()
             ->when($isActive !== null && $isActive !== '' && $isActive !== 'all', function ($query) use ($isActive) {
@@ -28,12 +29,18 @@ class AcademicPeriodController extends Controller
                         ->orWhere('name', 'like', "%{$search}%");
                 });
             })
-            ->get();
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
             'message' => 'Academic periods retrieved successfully',
             'data' => AcademicPeriodResource::collection($periods),
+            'meta' => [
+                'current_page' => $periods->currentPage(),
+                'last_page' => $periods->lastPage(),
+                'per_page' => $periods->perPage(),
+                'total' => $periods->total(),
+            ],
         ]);
     }
 

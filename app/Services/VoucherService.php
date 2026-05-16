@@ -6,9 +6,19 @@ use App\Models\Voucher;
 
 class VoucherService
 {
-    public function getAll()
+    public function getAll(string $search = '', int $perPage = 10)
     {
-        return Voucher::latest()->paginate(10);
+        $perPage = max($perPage, 1);
+
+        return Voucher::query()
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('code', 'like', "%{$search}%")
+                        ->orWhere('discount_type', 'like', "%{$search}%");
+                });
+            })
+            ->latest()
+            ->paginate($perPage);
     }
 
     public function findById(int $id)

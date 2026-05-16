@@ -22,7 +22,8 @@ class SkillController extends Controller
     public function index(Request $request)
     {
         $perPage = (int) $request->query('per_page', 10);
-        $skills = $this->service->getAll($perPage);
+        $search = trim((string) $request->query('search', ''));
+        $skills = $this->service->getAll($perPage, $search);
 
         return response()->json([
             'success' => true,

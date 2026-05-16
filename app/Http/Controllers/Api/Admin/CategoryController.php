@@ -8,7 +8,6 @@ use App\Http\Requests\Admin\Category\UpdateCategoryRequest;
 use App\Http\Resources\CategoryResource;
 use App\Services\CategoryService;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpKernel\HttpCache\Store;
 
 class CategoryController extends Controller
 {
@@ -20,9 +19,11 @@ class CategoryController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $categories = $this->service->getAll();
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 10);
+        $categories = $this->service->getAll($search, $perPage);
         return response()->json([
             'success' => true,
             'message' => 'Categories retrieved successfully',

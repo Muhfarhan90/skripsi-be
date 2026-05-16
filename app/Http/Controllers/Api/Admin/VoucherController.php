@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\Voucher\StoreVoucherRequest;
 use App\Http\Requests\Admin\Voucher\UpdateVoucherRequest;
 use App\Http\Resources\VoucherResource;
 use App\Services\VoucherService;
+use Illuminate\Http\Request;
 
 class VoucherController extends Controller
 {
@@ -17,9 +18,11 @@ class VoucherController extends Controller
         $this->service = $voucherService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $voucher = $this->service->getAll();
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 10);
+        $voucher = $this->service->getAll($search, $perPage);
 
         return response()->json([
             'success' => true,
