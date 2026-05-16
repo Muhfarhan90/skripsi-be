@@ -57,12 +57,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/cart', [CartController::class, 'show']);
     Route::post('/cart/items', [CartController::class, 'addItem']);
     Route::delete('/cart/items/{courseId}', [CartController::class, 'removeItem']);
+    Route::post('/cart/apply-voucher', [CartController::class, 'applyVoucher']);
     Route::post('/cart/checkout', [CartController::class, 'checkout']);
 
     Route::get('/enrollments', [EnrollmentController::class, 'index']);
     Route::get('/enrollments/{id}', [EnrollmentController::class, 'show']);
     Route::get('/enrollments/{id}/curriculum', [EnrollmentController::class, 'curriculum']);
     Route::get('/enrollments/{id}/lessons/{lessonId}', [EnrollmentController::class, 'lessonDetail']);
+    Route::get('/enrollments/{id}/quizzes/{quizId}', [EnrollmentController::class, 'quizDetail']);
     Route::get('/enrollments/{id}/progress-summary', [EnrollmentController::class, 'progressSummary']);
     Route::get('/enrollments/{id}/next-lesson', [EnrollmentController::class, 'nextLesson']);
     Route::post('/enrollments/{id}/complete', [EnrollmentController::class, 'complete']);

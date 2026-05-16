@@ -7,6 +7,7 @@ use App\Http\Resources\CourseCurriculumResource;
 use App\Http\Resources\EnrollmentResource;
 use App\Http\Resources\LessonResource;
 use App\Http\Resources\LessonProgressResource;
+use App\Http\Resources\StudentQuizDetailResource;
 use App\Models\Course;
 use App\Services\EnrollmentService;
 use Illuminate\Http\Request;
@@ -105,6 +106,24 @@ class EnrollmentController extends Controller
                     ? new LessonProgressResource($detail['progress'])
                     : null,
             ],
+        ]);
+    }
+
+    public function quizDetail(Request $request, string $id, string $quizId)
+    {
+        $detail = $this->service->findQuizDetailForUser(
+            (int) $request->user()->id,
+            (int) $id,
+            (int) $quizId
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Enrollment quiz detail retrieved successfully',
+            'data' => new StudentQuizDetailResource(
+                $detail['quiz'],
+                $detail['unsupported_question_types']
+            ),
         ]);
     }
 

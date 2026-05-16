@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cart\AddCartItemRequest;
+use App\Http\Requests\Cart\ApplyCartVoucherRequest;
 use App\Http\Requests\Cart\CheckoutCartRequest;
 use App\Http\Resources\OrderResource;
 use App\Services\OrderService;
@@ -68,6 +69,20 @@ class CartController extends Controller
             'success' => true,
             'message' => 'Course removed from cart successfully',
             'data' => $cart ? new OrderResource($cart) : null,
+        ]);
+    }
+
+    public function applyVoucher(ApplyCartVoucherRequest $request)
+    {
+        $cart = $this->service->applyVoucherToCart(
+            (int) $request->user()->id,
+            (string) $request->validated('voucher_code'),
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Voucher applied successfully',
+            'data' => new OrderResource($cart),
         ]);
     }
 
