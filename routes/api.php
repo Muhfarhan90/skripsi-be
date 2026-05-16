@@ -142,6 +142,8 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::put('/courses/{courseId}/assignments/{assignmentId}', [AdminAssignmentController::class, 'updateForCourse']);
     Route::get('/assignments/{assignmentId}/submissions', [AdminAssignmentController::class, 'submissions']);
     Route::put('/assignment-submissions/{submissionId}/review', [AdminAssignmentController::class, 'reviewSubmission']);
+    Route::get('/course-offerings/{id}/enrollments', [CourseOfferingController::class, 'enrollments']);
+    Route::get('/course-offerings/{id}/assignment-submissions', [CourseOfferingController::class, 'assignmentSubmissions']);
 
     Route::get('/enrollments/{enrollmentId}/lesson-progress', [AdminLessonProgressController::class, 'index']);
     Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'show']);
