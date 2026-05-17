@@ -54,6 +54,8 @@ class CourseService
                     $query->with('academicPeriod');
                 },
             ])
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating')
             ->whereHas('courseOfferings', function ($query) {
                 $this->applyPublishedOfferingScope($query);
             })
@@ -84,6 +86,8 @@ class CourseService
                     $query->with('academicPeriod');
                 },
             ])
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating')
             ->where('slug', $slug)
             ->whereHas('courseOfferings', function ($query) {
                 $this->applyPublishedOfferingScope($query);

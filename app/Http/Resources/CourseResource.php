@@ -34,6 +34,10 @@ class CourseResource extends JsonResource
             'course_offering_id' => $catalogOffering?->id,
             'price' => $catalogOffering?->price,
             'discount_price' => $catalogOffering?->discount_price,
+            'reviews_count' => isset($this->reviews_count) ? (int) $this->reviews_count : 0,
+            'reviews_avg_rating' => isset($this->reviews_avg_rating)
+                ? round((float) $this->reviews_avg_rating, 1)
+                : null,
             'thumbnail' => $this->thumbnail,
             'status' => $catalogOffering ? 'Tersedia' : 'Tidak tersedia',
             'skills' => $this->relationLoaded('skills')
