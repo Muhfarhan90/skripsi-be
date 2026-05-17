@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use Carbon\Carbon;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -20,8 +19,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Carbon::serializeUsing(function (Carbon $carbon): string {
-            return $carbon->copy()->utc()->format('Y-m-d\TH:i:s\Z');
-        });
+        //
     }
 }

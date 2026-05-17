@@ -12,13 +12,21 @@ class Certificate extends Model
         'enrollment_id',
         'certificate_number',
         'certificate_url',
+        'status',
+        'template_version',
+        'verification_code',
+        'snapshot_data',
         'issued_at',
         'expired_at',
+        'revoked_at',
+        'revoked_reason',
     ];
 
     protected $casts = [
+        'snapshot_data' => 'array',
         'issued_at' => 'datetime',
         'expired_at' => 'datetime',
+        'revoked_at' => 'datetime',
     ];
 
     public function user()

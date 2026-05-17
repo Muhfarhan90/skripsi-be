@@ -26,7 +26,7 @@ class CertificateController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Certificates retrieved successfully',
-            'data' => CertificateResource::collection($certificates),
+            'data' => CertificateResource::collection($certificates->getCollection())->resolve($request),
             'meta' => [
                 'current_page' => $certificates->currentPage(),
                 'last_page' => $certificates->lastPage(),
@@ -69,5 +69,24 @@ class CertificateController extends Controller
             'message' => 'Certificate generated successfully',
             'data' => new CertificateResource($certificate),
         ], 201);
+    }
+
+    public function preview(Request $request, string $certificateId)
+    {
+        $certificate = $this->service->getOwnedCertificate((int) $certificateId, $request->user());
+
+        return response($this->service->renderCertificatePrintPreview($certificate), 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+        ]);
+    }
+
+    public function download(Request $request, string $certificateId)
+    {
+        $certificate = $this->service->getOwnedCertificate((int) $certificateId, $request->user());
+
+        return response($this->service->renderCertificatePdf($certificate), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $this->service->getDownloadFilename($certificate) . '"',
+        ]);
     }
 }

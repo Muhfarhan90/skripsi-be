@@ -7,12 +7,14 @@ use App\Http\Requests\Admin\CourseOffering\StoreCourseOfferingRequest;
 use App\Http\Requests\Admin\CourseOffering\UpdateCourseOfferingRequest;
 use App\Http\Resources\AdminOfferingAssignmentSubmissionResource;
 use App\Http\Resources\AdminOfferingEnrollmentResource;
+use App\Http\Resources\CertificateResource;
 use App\Http\Resources\CourseOfferingResource;
 use App\Models\AcademicPeriod;
 use App\Models\Course;
 use App\Models\CourseOffering;
 use App\Models\User;
 use App\Services\AssignmentService;
+use App\Services\CertificateService;
 use App\Services\EnrollmentService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -178,6 +180,45 @@ class CourseOfferingController extends Controller
                 'per_page' => $submissions->perPage(),
                 'total' => $submissions->total(),
             ],
+        ]);
+    }
+
+    public function generateCertificate(
+        Request $request,
+        string $id,
+        string $enrollmentId,
+        CertificateService $certificateService
+    ) {
+        $offering = $this->resolveManagedOffering((int) $id, $request->user());
+        $certificate = $certificateService->generateCertificateForManagedEnrollment(
+            $offering->id,
+            (int) $enrollmentId,
+            $request->user()
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Certificate generated successfully',
+            'data' => new CertificateResource($certificate),
+        ]);
+    }
+
+    public function downloadCertificate(
+        Request $request,
+        string $id,
+        string $certificateId,
+        CertificateService $certificateService
+    ) {
+        $offering = $this->resolveManagedOffering((int) $id, $request->user());
+        $certificate = $certificateService->getManagedCertificateForOffering(
+            $offering->id,
+            (int) $certificateId,
+            $request->user()
+        );
+
+        return response($certificateService->renderCertificatePdf($certificate), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $certificateService->getDownloadFilename($certificate) . '"',
         ]);
     }
 

@@ -2,13 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\Certificate;
+use App\Models\Course;
 use App\Models\Enrollment;
+use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
 use App\Models\Lesson;
 use App\Models\LessonProgress;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use Carbon\Carbon;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class EnrollmentService
@@ -16,7 +18,10 @@ class EnrollmentService
     protected OrderService $orderService;
     protected AssignmentService $assignmentService;
 
-    public function __construct(OrderService $orderService, AssignmentService $assignmentService)
+    public function __construct(
+        OrderService $orderService,
+        AssignmentService $assignmentService
+    )
     {
         $this->orderService = $orderService;
         $this->assignmentService = $assignmentService;
@@ -42,7 +47,13 @@ class EnrollmentService
 
         $enrollments->setCollection(
             $enrollments->getCollection()->map(
-                fn (Enrollment $enrollment) => $this->normalizePaidEnrollmentAccess($enrollment)
+                fn (Enrollment $enrollment) => $this->syncProgress($enrollment->id)->fresh([
+                    'courseOffering.course.category:id,name',
+                    'courseOffering.course.instructor:id,fullname',
+                    'courseOffering.academicPeriod',
+                    'order',
+                    'certificate',
+                ])
             )
         );
 
@@ -91,8 +102,6 @@ class EnrollmentService
             $enrollment = $enrollment->fresh();
         }
 
-        $this->ensureCertificateGenerated($enrollment);
-
         return $enrollment->fresh([
             'courseOffering.course.category:id,name',
             'courseOffering.course.instructor:id,fullname',
@@ -106,22 +115,23 @@ class EnrollmentService
     {
         $ownedEnrollment = $this->findByIdForUser($userId, $id);
         $enrollment = $this->syncProgress($ownedEnrollment->id);
-        $courseId = $this->resolveCourseId($enrollment);
-
-        $totalLessons = Lesson::whereHas('section', function ($query) use ($courseId) {
-            $query->where('course_id', $courseId);
-        })->count();
-
-        $completedLessons = LessonProgress::where('enrollment_id', $enrollment->id)
-            ->whereNotNull('completed_at')
-            ->count();
+        $progress = $this->calculateLearningProgress($enrollment);
 
         return [
             'enrollment_id' => $enrollment->id,
-            'total_lessons' => $totalLessons,
-            'completed_lessons' => $completedLessons,
-            'remaining_lessons' => max(0, $totalLessons - $completedLessons),
-            'progress' => $enrollment->progress,
+            'total_items' => $progress['total_items'],
+            'completed_items' => $progress['completed_items'],
+            'remaining_items' => $progress['remaining_items'],
+            'total_lessons' => $progress['total_lessons'],
+            'completed_lessons' => $progress['completed_lessons'],
+            'remaining_lessons' => $progress['remaining_lessons'],
+            'total_quizzes' => $progress['total_quizzes'],
+            'completed_quizzes' => $progress['completed_quizzes'],
+            'remaining_quizzes' => $progress['remaining_quizzes'],
+            'total_assignments' => $progress['total_assignments'],
+            'completed_assignments' => $progress['completed_assignments'],
+            'remaining_assignments' => $progress['remaining_assignments'],
+            'progress' => $progress['progress'],
             'status' => $enrollment->status,
             'has_certificate' => $this->hasCertificateForEnrollment($enrollment),
             'completed_at' => $enrollment->completed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
@@ -301,10 +311,6 @@ class EnrollmentService
         $enrollment->update($payload);
         $enrollment = $enrollment->fresh();
 
-        if ($enrollment->status === 'completed') {
-            $this->ensureCertificateGenerated($enrollment);
-        }
-
         return $enrollment->fresh([
             'courseOffering.course',
             'courseOffering.academicPeriod',
@@ -317,19 +323,7 @@ class EnrollmentService
     {
         $enrollment = Enrollment::with(['order', 'courseOffering.academicPeriod', 'certificate'])->findOrFail($enrollmentId);
         $enrollment = $this->normalizePaidEnrollmentAccess($enrollment);
-        $courseId = $this->resolveCourseId($enrollment);
-
-        $totalLessons = Lesson::whereHas('section', function ($query) use ($courseId) {
-            $query->where('course_id', $courseId);
-        })->count();
-
-        $completedLessons = LessonProgress::where('enrollment_id', $enrollment->id)
-            ->whereNotNull('completed_at')
-            ->count();
-
-        $progress = $totalLessons > 0
-            ? (int) floor(($completedLessons / $totalLessons) * 100)
-            : 0;
+        $progress = $this->calculateLearningProgress($enrollment)['progress'];
 
         $payload = ['progress' => $progress];
         $effectiveEndedAt = $this->getEffectiveEndedAt($enrollment);
@@ -350,14 +344,8 @@ class EnrollmentService
         }
 
         $enrollment->update($payload);
-        $enrollment = $enrollment->fresh(['certificate']);
-
-        if ($enrollment->status === 'completed') {
-            $this->ensureCertificateGenerated($enrollment);
-            $enrollment = $enrollment->fresh(['certificate']);
-        }
-
-        return $enrollment;
+        
+        return $enrollment->fresh(['certificate']);
     }
 
     public function assertCanReadMaterial(Enrollment $enrollment): void
@@ -467,32 +455,79 @@ class EnrollmentService
             return $enrollment->certificate !== null;
         }
 
-        return Certificate::where('enrollment_id', $enrollment->id)->exists();
+        return $enrollment->certificate()->exists();
     }
 
-    private function ensureCertificateGenerated(Enrollment $enrollment): void
+    private function calculateLearningProgress(Enrollment $enrollment): array
     {
-        if (! $this->assignmentService->isCompletionRequirementMet($enrollment)) {
-            return;
-        }
+        $courseId = $this->resolveCourseId($enrollment);
 
-        $certificate = Certificate::where('enrollment_id', $enrollment->id)->first();
-        if ($certificate) {
-            return;
-        }
+        $lessonIds = Lesson::query()
+            ->select('lessons.id')
+            ->join('sections', 'sections.id', '=', 'lessons.section_id')
+            ->where('sections.course_id', $courseId)
+            ->pluck('lessons.id');
 
-        $issuedAt = now();
-        $certificateNumber = 'CERT-' . $issuedAt->format('Ymd') . '-' . strtoupper(Str::random(10));
+        $totalLessons = $lessonIds->count();
+        $completedLessons = LessonProgress::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->whereIn('lesson_id', $lessonIds)
+            ->whereNotNull('completed_at')
+            ->count();
 
-        Certificate::create([
-            'user_id' => $enrollment->user_id,
-            'course_id' => $this->resolveCourseId($enrollment),
-            'enrollment_id' => $enrollment->id,
-            'certificate_number' => $certificateNumber,
-            'certificate_url' => url('/certificates/' . $certificateNumber . '.pdf'),
-            'issued_at' => $issuedAt,
-            'expired_at' => null,
-        ]);
+        $quizzes = Quiz::query()
+            ->where('course_id', $courseId)
+            ->where('is_active', true)
+            ->get(['id', 'passing_score']);
+
+        $totalQuizzes = $quizzes->count();
+        $completedQuizzes = $quizzes->filter(function (Quiz $quiz) use ($enrollment): bool {
+            $attemptQuery = QuizAttempt::query()
+                ->where('enrollment_id', $enrollment->id)
+                ->where('quiz_id', $quiz->id)
+                ->where('status', 'graded');
+
+            if ($quiz->passing_score !== null) {
+                $attemptQuery->where('total_score', '>=', (int) $quiz->passing_score);
+            }
+
+            return $attemptQuery->exists();
+        })->count();
+
+        $assignmentIds = Assignment::query()
+            ->where('course_id', $courseId)
+            ->where('status', 'published')
+            ->pluck('id');
+
+        $totalAssignments = $assignmentIds->count();
+        $completedAssignments = AssignmentSubmission::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->whereIn('assignment_id', $assignmentIds)
+            ->where('status', 'approved')
+            ->distinct('assignment_id')
+            ->count('assignment_id');
+
+        $totalItems = $totalLessons + $totalQuizzes + $totalAssignments;
+        $completedItems = $completedLessons + $completedQuizzes + $completedAssignments;
+        $progress = $totalItems > 0
+            ? (int) floor(($completedItems / $totalItems) * 100)
+            : 0;
+
+        return [
+            'total_items' => $totalItems,
+            'completed_items' => $completedItems,
+            'remaining_items' => max(0, $totalItems - $completedItems),
+            'total_lessons' => $totalLessons,
+            'completed_lessons' => $completedLessons,
+            'remaining_lessons' => max(0, $totalLessons - $completedLessons),
+            'total_quizzes' => $totalQuizzes,
+            'completed_quizzes' => $completedQuizzes,
+            'remaining_quizzes' => max(0, $totalQuizzes - $completedQuizzes),
+            'total_assignments' => $totalAssignments,
+            'completed_assignments' => $completedAssignments,
+            'remaining_assignments' => max(0, $totalAssignments - $completedAssignments),
+            'progress' => $progress,
+        ];
     }
 
     private function resolveCourseId(Enrollment $enrollment): int

@@ -139,7 +139,7 @@ class QuizAttemptService
             ]);
         }
 
-        return DB::transaction(function () use ($attempt) {
+        $submittedAttempt = DB::transaction(function () use ($attempt) {
             $totalScore = (int) QuizAnswer::where('attempt_id', $attempt->id)->sum('score');
             $hasManualReview = QuizAnswer::query()
                 ->join('questions', 'questions.id', '=', 'quiz_answers.question_id')
@@ -155,6 +155,10 @@ class QuizAttemptService
 
             return $attempt->fresh('answers');
         });
+
+        $this->enrollmentService->syncProgress($enrollment->id);
+
+        return $submittedAttempt->fresh('answers');
     }
 
     public function getAttemptsByQuizForAdmin(int $quizId)

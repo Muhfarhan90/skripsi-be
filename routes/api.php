@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\CategoryController;
 use App\Http\Controllers\Api\Admin\AcademicPeriodController;
 use App\Http\Controllers\Api\Admin\AssignmentController as AdminAssignmentController;
+use App\Http\Controllers\Api\Admin\CertificateSettingController;
 use App\Http\Controllers\Api\Admin\CourseController;
 use App\Http\Controllers\Api\Admin\CourseOfferingController;
 use App\Http\Controllers\Api\Admin\EnrollmentController as AdminEnrollmentController;
@@ -106,6 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Certificates
     Route::get('/certificates', [CertificateController::class, 'index']);
+    Route::get('/certificates/{certificateId}/preview', [CertificateController::class, 'preview']);
+    Route::get('/certificates/{certificateId}/download', [CertificateController::class, 'download']);
     Route::get('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'show']);
     Route::post('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'generate']);
 });
@@ -144,6 +147,11 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::put('/assignment-submissions/{submissionId}/review', [AdminAssignmentController::class, 'reviewSubmission']);
     Route::get('/course-offerings/{id}/enrollments', [CourseOfferingController::class, 'enrollments']);
     Route::get('/course-offerings/{id}/assignment-submissions', [CourseOfferingController::class, 'assignmentSubmissions']);
+    Route::post('/course-offerings/{id}/enrollments/{enrollmentId}/certificate', [CourseOfferingController::class, 'generateCertificate']);
+    Route::get('/course-offerings/{id}/certificates/{certificateId}/download', [CourseOfferingController::class, 'downloadCertificate']);
+    Route::get('/certificate-settings', [CertificateSettingController::class, 'show']);
+    Route::put('/certificate-settings', [CertificateSettingController::class, 'update']);
+    Route::post('/certificate-settings/assets', [CertificateSettingController::class, 'uploadAsset']);
 
     Route::get('/enrollments/{enrollmentId}/lesson-progress', [AdminLessonProgressController::class, 'index']);
     Route::get('/enrollments/{enrollmentId}/lesson-progress/{lessonId}', [AdminLessonProgressController::class, 'show']);
