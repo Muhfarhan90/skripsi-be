@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
             LessonProgressSeeder::class,
             QuizAttemptSeeder::class,
             QuizAnswerSeeder::class,
+            CertificateDemoCourseSeeder::class,
         ]);
     }
 }
