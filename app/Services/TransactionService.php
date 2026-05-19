@@ -8,11 +8,19 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Transaction;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TransactionService
 {
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function getAll()
     {
         return Transaction::latest()->paginate(10);
@@ -53,6 +61,7 @@ class TransactionService
         return DB::transaction(function () use ($id, $data) {
             $transaction = $this->findById($id);
             $oldStatus = $transaction->status;
+            $activatedEnrollments = collect();
 
             if (array_key_exists('status', $data)) {
                 $data['status'] = $this->normalizeStatus((string) $data['status']);
@@ -67,19 +76,26 @@ class TransactionService
                         $order->update(['status' => 'completed']);
                     }
 
-                    $this->activateOrderEnrollments($order);
+                    $activatedEnrollments = $this->activateOrderEnrollments($order);
                 }
 
                 if (! $transaction->paid_at) {
                     $transaction->update(['paid_at' => now()]);
                 }
+
+                $this->notificationService->publishTransactionSuccess(
+                    $transaction->fresh(),
+                    $activatedEnrollments
+                );
             }
 
-            if ($transaction->status === 'failed') {
+            if ($oldStatus !== 'failed' && $transaction->status === 'failed') {
                 $order = $transaction->order;
                 if ($order && $order->status !== 'completed') {
                     $order->update(['status' => 'cancelled']);
                 }
+
+                $this->notificationService->publishTransactionFailed($transaction->fresh());
             }
 
             return $transaction->fresh();
@@ -109,9 +125,10 @@ class TransactionService
         return $normalized;
     }
 
-    private function activateOrderEnrollments(Order $order): void
+    private function activateOrderEnrollments(Order $order): Collection
     {
         $order->loadMissing('items.courseOffering.course', 'items.courseOffering.academicPeriod');
+        $activatedEnrollments = collect();
 
         foreach ($order->items as $item) {
             $offering = $this->resolveOfferingForOrderItem($item);
@@ -140,7 +157,10 @@ class TransactionService
 
             $enrollment->fill($payload);
             $enrollment->save();
+            $activatedEnrollments->push($enrollment->fresh(['courseOffering.course']));
         }
+
+        return $activatedEnrollments;
     }
 
     private function resolveOfferingForOrderItem(OrderItem $item): CourseOffering

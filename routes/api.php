@@ -27,12 +27,14 @@ use App\Http\Controllers\Api\CourseCatalogController;
 use App\Http\Controllers\Api\AssignmentController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\ForumController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\LessonProgressController;
 use App\Http\Controllers\Api\QuizAttemptController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\UserDeviceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +51,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+});
+
+Route::prefix('auth')->middleware('auth:sanctum')->group(function () {
+    Route::post('/devices', [UserDeviceController::class, 'store']);
+    Route::delete('/devices/{deviceId}', [UserDeviceController::class, 'destroy']);
 });
 
 Route::get('/courses', [CourseCatalogController::class, 'index']);
@@ -88,6 +95,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::patch('/orders/{id}/payment-submission', [OrderController::class, 'submitPayment']);
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 
     // Forum (Student) - harus enrolled
     Route::get('/courses/{courseId}/forum', [ForumController::class, 'index']);

@@ -8,16 +8,19 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Voucher;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class OrderService
 {
     protected TransactionService $transactionService;
+    protected NotificationService $notificationService;
 
-    public function __construct(TransactionService $transactionService)
+    public function __construct(TransactionService $transactionService, NotificationService $notificationService)
     {
         $this->transactionService = $transactionService;
+        $this->notificationService = $notificationService;
     }
 
     /*
@@ -58,6 +61,7 @@ class OrderService
         return DB::transaction(function () use ($id, $status) {
             $order = Order::findOrFail($id);
             $oldStatus = $order->status;
+            $activatedEnrollments = collect();
 
             if ($oldStatus === $status) {
                 return $this->freshOrderWithRelations($order->id);
@@ -66,12 +70,21 @@ class OrderService
             $order->update(['status' => $status]);
 
             if ($status === 'completed') {
-                $this->activateOrderEnrollments($order);
+                $activatedEnrollments = $this->activateOrderEnrollments($order);
 
                 $order->transactions()->where('status', 'pending')->update([
                     'status' => 'success',
                     'paid_at' => now(),
                 ]);
+
+                $transaction = $order->transactions()
+                    ->where('status', 'success')
+                    ->latest('id')
+                    ->first();
+
+                if ($transaction) {
+                    $this->notificationService->publishTransactionSuccess($transaction, $activatedEnrollments);
+                }
             }
 
             if ($status === 'cancelled') {
@@ -79,6 +92,15 @@ class OrderService
                     ->where('status', '!=', 'completed')
                     ->update(['status' => 'cancelled']);
                 $order->transactions()->where('status', 'pending')->update(['status' => 'failed']);
+
+                $transaction = $order->transactions()
+                    ->where('status', 'failed')
+                    ->latest('id')
+                    ->first();
+
+                if ($transaction) {
+                    $this->notificationService->publishTransactionFailed($transaction);
+                }
             }
 
             return $this->freshOrderWithRelations($order->id);
@@ -366,8 +388,10 @@ class OrderService
                 $order->items()->create($item);
             }
 
+            $transaction = null;
+
             if ($status !== 'cart') {
-                $this->transactionService->create([
+                $transaction = $this->transactionService->create([
                     'order_id' => $order->id,
                     'amount' => $order->grand_total,
                     'status' => $status === 'completed' ? 'success' : 'pending',
@@ -377,7 +401,11 @@ class OrderService
             }
 
             if ($status === 'completed') {
-                $this->activateOrderEnrollments($order);
+                $activatedEnrollments = $this->activateOrderEnrollments($order);
+
+                if ($transaction) {
+                    $this->notificationService->publishTransactionSuccess($transaction, $activatedEnrollments);
+                }
             }
 
             return $this->freshOrderWithRelations($order->id);
@@ -725,9 +753,10 @@ class OrderService
         ];
     }
 
-    public function activateOrderEnrollments(Order $order): void
+    public function activateOrderEnrollments(Order $order): Collection
     {
         $order->loadMissing('items.courseOffering.course', 'items.courseOffering.academicPeriod');
+        $activatedEnrollments = collect();
 
         foreach ($order->items as $item) {
             $offering = $this->resolveOfferingForOrderItem($item);
@@ -757,7 +786,10 @@ class OrderService
 
             $enrollment->fill($payload);
             $enrollment->save();
+            $activatedEnrollments->push($enrollment->fresh(['courseOffering.course']));
         }
+
+        return $activatedEnrollments;
     }
 
     private function resolveEnrollmentEndAt(CourseOffering $offering): ?Carbon
