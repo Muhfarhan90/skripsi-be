@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendPushNotificationJob;
 use App\Models\Enrollment;
 use App\Models\Notification;
 use App\Models\Transaction;
@@ -158,6 +159,10 @@ class NotificationService
         }
 
         $notification->save();
+
+        if ($notification->wasRecentlyCreated) {
+            SendPushNotificationJob::dispatch($notification->id)->afterCommit();
+        }
 
         return $notification;
     }
