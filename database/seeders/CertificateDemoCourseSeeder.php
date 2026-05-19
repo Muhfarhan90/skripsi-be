@@ -9,6 +9,8 @@ use App\Models\Category;
 use App\Models\Course;
 use App\Models\CourseOffering;
 use App\Models\Enrollment;
+use App\Models\ForumPost;
+use App\Models\ForumReply;
 use App\Models\Lesson;
 use App\Models\LessonProgress;
 use App\Models\Option;
@@ -114,6 +116,7 @@ class CertificateDemoCourseSeeder extends Seeder
             $assignment,
             $reviewer
         );
+        $this->seedForumDiscussions($course, $freshStudent, $readyStudent, $instructor);
 
         $enrollmentService = app(EnrollmentService::class);
         $enrollmentService->syncProgress($freshEnrollment->id);
@@ -719,5 +722,101 @@ class CertificateDemoCourseSeeder extends Seeder
             'progress' => 0,
             'completed_at' => null,
         ]);
+    }
+
+    private function seedForumDiscussions(
+        Course $course,
+        User $freshStudent,
+        User $readyStudent,
+        User $instructor
+    ): void {
+        $postIds = ForumPost::withTrashed()
+            ->where('course_id', $course->id)
+            ->pluck('id');
+
+        if ($postIds->isNotEmpty()) {
+            ForumReply::withTrashed()->whereIn('post_id', $postIds)->forceDelete();
+        }
+
+        ForumPost::withTrashed()->where('course_id', $course->id)->forceDelete();
+
+        $baseTime = now()->subDays(4);
+        $posts = [];
+
+        $posts['welcome'] = ForumPost::create([
+            'course_id' => $course->id,
+            'user_id' => $instructor->id,
+            'title' => 'Selamat datang di forum kelas',
+            'content' => 'Gunakan forum ini untuk bertanya seputar lesson, quiz, atau assignment. Usahakan judul diskusi jelas agar teman lain mudah membantu.',
+            'is_pinned' => true,
+        ]);
+        $posts['welcome']->forceFill([
+            'created_at' => $baseTime->copy(),
+            'updated_at' => $baseTime->copy(),
+        ])->save();
+
+        $posts['functions'] = ForumPost::create([
+            'course_id' => $course->id,
+            'user_id' => $freshStudent->id,
+            'title' => 'Cara paling mudah memahami function itu bagaimana?',
+            'content' => 'Saya masih sering bingung kapan logika perlu dipisah menjadi function. Kalau ada contoh sederhana untuk pemula akan sangat membantu.',
+            'is_pinned' => false,
+        ]);
+        $posts['functions']->forceFill([
+            'created_at' => $baseTime->copy()->addHours(6),
+            'updated_at' => $baseTime->copy()->addHours(7),
+        ])->save();
+
+        $posts['assignment'] = ForumPost::create([
+            'course_id' => $course->id,
+            'user_id' => $readyStudent->id,
+            'title' => 'Tips menyusun jawaban assignment akhir',
+            'content' => 'Sebelum submit assignment, saya sarankan cek lagi alur input-proses-output dan pastikan penjelasan pseudocode-nya singkat tapi runtut.',
+            'is_pinned' => false,
+        ]);
+        $posts['assignment']->forceFill([
+            'created_at' => $baseTime->copy()->addDay(),
+            'updated_at' => $baseTime->copy()->addDay()->addHours(2),
+        ])->save();
+
+        $replies = [
+            [
+                'post' => $posts['welcome'],
+                'user' => $readyStudent,
+                'content' => 'Siap, nanti saya akan pakai forum ini kalau ada bagian lesson atau quiz yang kurang saya pahami.',
+                'created_at' => $baseTime->copy()->addHours(2),
+            ],
+            [
+                'post' => $posts['functions'],
+                'user' => $instructor,
+                'content' => 'Mulai dari function kecil dulu. Biasanya kalau satu blok kode sering diulang atau punya satu tujuan jelas, itu kandidat bagus untuk dipisah jadi function.',
+                'created_at' => $baseTime->copy()->addHours(6)->addMinutes(30),
+            ],
+            [
+                'post' => $posts['functions'],
+                'user' => $readyStudent,
+                'content' => 'Saya biasanya membayangkan function seperti tombol dengan satu tugas spesifik. Pendekatan itu cukup membantu waktu belajar dasar.',
+                'created_at' => $baseTime->copy()->addHours(7),
+            ],
+            [
+                'post' => $posts['assignment'],
+                'user' => $instructor,
+                'content' => 'Betul. Tambahkan juga alasan kenapa kamu memilih variabel, percabangan, dan function tertentu supaya reviewer lebih mudah melihat pemahamanmu.',
+                'created_at' => $baseTime->copy()->addDay()->addHours(1),
+            ],
+        ];
+
+        foreach ($replies as $replyRow) {
+            $reply = ForumReply::create([
+                'post_id' => $replyRow['post']->id,
+                'user_id' => $replyRow['user']->id,
+                'content' => $replyRow['content'],
+            ]);
+
+            $reply->forceFill([
+                'created_at' => $replyRow['created_at'],
+                'updated_at' => $replyRow['created_at'],
+            ])->save();
+        }
     }
 }

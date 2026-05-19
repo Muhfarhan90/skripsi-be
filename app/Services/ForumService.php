@@ -47,7 +47,10 @@ class ForumService
         $this->ensureEnrolled($courseId, $userId);
 
         return ForumPost::where('course_id', $courseId)
-            ->with(['user', 'replies.user'])
+            ->with([
+                'user',
+                'replies' => fn ($query) => $query->with('user')->oldest('created_at'),
+            ])
             ->findOrFail($postId);
     }
 
@@ -163,7 +166,10 @@ class ForumService
         $this->ensureAdminAccess($courseId, $user);
 
         return ForumPost::where('course_id', $courseId)
-            ->with(['user', 'replies.user'])
+            ->with([
+                'user',
+                'replies' => fn ($query) => $query->with('user')->oldest('created_at'),
+            ])
             ->findOrFail($postId);
     }
 
