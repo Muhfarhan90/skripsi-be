@@ -29,7 +29,6 @@ class UpdateCourseOfferingRequest extends FormRequest
                 }),
             ],
             'academic_period_id' => ['required', 'integer', 'exists:academic_periods,id'],
-            'title' => ['required', 'string', 'max:255'],
             'capacity' => ['required', 'integer', 'min:1'],
             'price' => ['required', 'numeric', 'min:0'],
             'discount_price' => ['nullable', 'numeric', 'min:0', 'lte:price'],

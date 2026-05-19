@@ -16,14 +16,22 @@ class OrderSeeder extends Seeder
     public function run(): void
     {
         $studentIds = User::query()->pluck('id', 'email');
-        $offeringByTitle = CourseOffering::query()->get()->keyBy('title');
+        $offeringByCourseAndPeriod = CourseOffering::query()
+            ->with(['course:id,slug', 'academicPeriod:id,code'])
+            ->get()
+            ->keyBy(fn (CourseOffering $offering) => sprintf(
+                '%s|%s',
+                (string) $offering->course?->slug,
+                (string) $offering->academicPeriod?->code
+            ));
 
         $orders = [
             [
                 'order_code' => 'ORD-20260509-ACTIVE',
                 'invoice_code' => 'INV-20260509-ACTIVE',
                 'student_email' => 'student@example.com',
-                'offering_title' => 'Intro Programming - Cohort A1 2026',
+                'course_slug' => 'introduction-to-programming',
+                'period_code' => 'PRE-U-2026-A',
                 'status' => 'completed',
                 'payment_method' => 'Bank Transfer',
                 'payment_channel' => 'BCA',
@@ -35,7 +43,8 @@ class OrderSeeder extends Seeder
                 'order_code' => 'ORD-20260509-WAITING',
                 'invoice_code' => 'INV-20260509-WAITING',
                 'student_email' => 'student.waiting@example.com',
-                'offering_title' => 'Advanced Web Dev - Cohort B1 2026',
+                'course_slug' => 'advanced-web-development',
+                'period_code' => 'PRE-U-2026-A',
                 'status' => 'completed',
                 'payment_method' => 'Virtual Account',
                 'payment_channel' => 'Mandiri',
@@ -47,7 +56,8 @@ class OrderSeeder extends Seeder
                 'order_code' => 'ORD-20260509-EXPIRED',
                 'invoice_code' => 'INV-20260509-EXPIRED',
                 'student_email' => 'student.expired@example.com',
-                'offering_title' => 'Health Wellness - Cohort Legacy 2025',
+                'course_slug' => 'health-and-wellness',
+                'period_code' => 'PRE-U-2025-B',
                 'status' => 'completed',
                 'payment_method' => 'Bank Transfer',
                 'payment_channel' => 'BNI',
@@ -59,7 +69,8 @@ class OrderSeeder extends Seeder
                 'order_code' => 'ORD-20260509-COMPLETE',
                 'invoice_code' => 'INV-20260509-COMPLETE',
                 'student_email' => 'student.completed@example.com',
-                'offering_title' => 'Intro Programming - Cohort Legacy 2025',
+                'course_slug' => 'introduction-to-programming',
+                'period_code' => 'PRE-U-2025-B',
                 'status' => 'completed',
                 'payment_method' => 'Bank Transfer',
                 'payment_channel' => 'BRI',
@@ -71,7 +82,8 @@ class OrderSeeder extends Seeder
                 'order_code' => 'ORD-20260509-PENDING',
                 'invoice_code' => 'INV-20260509-PENDING',
                 'student_email' => 'student@example.com',
-                'offering_title' => 'Advanced Web Dev - Cohort B1 2026',
+                'course_slug' => 'advanced-web-development',
+                'period_code' => 'PRE-U-2026-A',
                 'status' => 'pending',
                 'payment_method' => 'Virtual Account',
                 'payment_channel' => 'Permata',
@@ -83,7 +95,11 @@ class OrderSeeder extends Seeder
 
         foreach ($orders as $seed) {
             $userId = $studentIds->get($seed['student_email']);
-            $offering = $offeringByTitle->get($seed['offering_title']);
+            $offering = $offeringByCourseAndPeriod->get(sprintf(
+                '%s|%s',
+                $seed['course_slug'],
+                $seed['period_code']
+            ));
 
             if (! $userId || ! $offering) {
                 continue;

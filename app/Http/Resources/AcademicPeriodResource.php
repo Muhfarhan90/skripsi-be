@@ -31,7 +31,6 @@ class AcademicPeriodResource extends JsonResource
                         'id' => $offering->id,
                         'course_id' => $offering->course_id,
                         'academic_period_id' => $offering->academic_period_id,
-                        'title' => $offering->title,
                         'capacity' => $offering->capacity,
                         'price' => $offering->price,
                         'discount_price' => $offering->discount_price,

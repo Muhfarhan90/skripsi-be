@@ -9,7 +9,6 @@ class CourseOffering extends Model
     protected $fillable = [
         'course_id',
         'academic_period_id',
-        'title',
         'capacity',
         'price',
         'discount_price',

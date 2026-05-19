@@ -19,7 +19,6 @@ class CourseOfferingSeeder extends Seeder
 
         $offerings = [
             [
-                'title' => 'Intro Programming - Cohort A1 2026',
                 'course_slug' => 'introduction-to-programming',
                 'period_code' => 'PRE-U-2026-A',
                 'capacity' => 120,
@@ -28,7 +27,6 @@ class CourseOfferingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'title' => 'Advanced Web Dev - Cohort B1 2026',
                 'course_slug' => 'advanced-web-development',
                 'period_code' => 'PRE-U-2026-A',
                 'capacity' => 80,
@@ -37,7 +35,6 @@ class CourseOfferingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'title' => 'Health Wellness - Cohort Legacy 2025',
                 'course_slug' => 'health-and-wellness',
                 'period_code' => 'PRE-U-2025-B',
                 'capacity' => 60,
@@ -46,7 +43,6 @@ class CourseOfferingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'title' => 'Intro Programming - Cohort Legacy 2025',
                 'course_slug' => 'introduction-to-programming',
                 'period_code' => 'PRE-U-2025-B',
                 'capacity' => 100,
@@ -65,11 +61,13 @@ class CourseOfferingSeeder extends Seeder
             }
 
             CourseOffering::updateOrCreate(
-                ['title' => $offering['title']],
                 [
                     'course_id' => $courseId,
                     'academic_period_id' => $periodId,
-                    'title' => $offering['title'],
+                ],
+                [
+                    'course_id' => $courseId,
+                    'academic_period_id' => $periodId,
                     'capacity' => $offering['capacity'],
                     'price' => $offering['price'],
                     'discount_price' => $offering['discount_price'],

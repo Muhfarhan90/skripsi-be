@@ -30,7 +30,6 @@ use Illuminate\Support\Carbon;
 class CertificateDemoCourseSeeder extends Seeder
 {
     private const COURSE_SLUG = 'certificate-demo-bootcamp';
-    private const OFFERING_TITLE = 'Certificate Demo Bootcamp - Cohort A 2026';
 
     public function run(): void
     {
@@ -513,11 +512,11 @@ class CertificateDemoCourseSeeder extends Seeder
         }
 
         return CourseOffering::updateOrCreate(
-            ['title' => self::OFFERING_TITLE],
             [
                 'course_id' => $course->id,
                 'academic_period_id' => $period->id,
-                'title' => self::OFFERING_TITLE,
+            ],
+            [
                 'capacity' => 50,
                 'price' => 299000,
                 'discount_price' => 249000,

@@ -45,10 +45,9 @@ class CourseOfferingController extends Controller
             })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($builder) use ($search) {
-                    $builder->where('title', 'like', "%{$search}%")
-                        ->orWhereHas('course', function ($courseQuery) use ($search) {
-                            $courseQuery->where('title', 'like', "%{$search}%");
-                        })
+                    $builder->whereHas('course', function ($courseQuery) use ($search) {
+                        $courseQuery->where('title', 'like', "%{$search}%");
+                    })
                         ->orWhereHas('academicPeriod', function ($periodQuery) use ($search) {
                             $periodQuery->where('code', 'like', "%{$search}%")
                                 ->orWhere('name', 'like', "%{$search}%");

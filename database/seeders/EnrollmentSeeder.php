@@ -16,13 +16,21 @@ class EnrollmentSeeder extends Seeder
     public function run(): void
     {
         $studentIds = User::query()->pluck('id', 'email');
-        $offeringByTitle = CourseOffering::query()->get()->keyBy('title');
+        $offeringByCourseAndPeriod = CourseOffering::query()
+            ->with(['course:id,slug', 'academicPeriod:id,code'])
+            ->get()
+            ->keyBy(fn (CourseOffering $offering) => sprintf(
+                '%s|%s',
+                (string) $offering->course?->slug,
+                (string) $offering->academicPeriod?->code
+            ));
         $orderByCode = Order::query()->pluck('id', 'order_code');
 
         $enrollments = [
             [
                 'student_email' => 'student@example.com',
-                'offering_title' => 'Intro Programming - Cohort A1 2026',
+                'course_slug' => 'introduction-to-programming',
+                'period_code' => 'PRE-U-2026-A',
                 'order_code' => 'ORD-20260509-ACTIVE',
                 'status' => 'active',
                 'progress' => 33,
@@ -32,7 +40,8 @@ class EnrollmentSeeder extends Seeder
             ],
             [
                 'student_email' => 'student.waiting@example.com',
-                'offering_title' => 'Advanced Web Dev - Cohort B1 2026',
+                'course_slug' => 'advanced-web-development',
+                'period_code' => 'PRE-U-2026-A',
                 'order_code' => 'ORD-20260509-WAITING',
                 'status' => 'pending',
                 'progress' => 0,
@@ -42,7 +51,8 @@ class EnrollmentSeeder extends Seeder
             ],
             [
                 'student_email' => 'student.expired@example.com',
-                'offering_title' => 'Health Wellness - Cohort Legacy 2025',
+                'course_slug' => 'health-and-wellness',
+                'period_code' => 'PRE-U-2025-B',
                 'order_code' => 'ORD-20260509-EXPIRED',
                 'status' => 'expired',
                 'progress' => 50,
@@ -52,7 +62,8 @@ class EnrollmentSeeder extends Seeder
             ],
             [
                 'student_email' => 'student.completed@example.com',
-                'offering_title' => 'Intro Programming - Cohort Legacy 2025',
+                'course_slug' => 'introduction-to-programming',
+                'period_code' => 'PRE-U-2025-B',
                 'order_code' => 'ORD-20260509-COMPLETE',
                 'status' => 'completed',
                 'progress' => 100,
@@ -64,7 +75,11 @@ class EnrollmentSeeder extends Seeder
 
         foreach ($enrollments as $seed) {
             $userId = $studentIds->get($seed['student_email']);
-            $offering = $offeringByTitle->get($seed['offering_title']);
+            $offering = $offeringByCourseAndPeriod->get(sprintf(
+                '%s|%s',
+                $seed['course_slug'],
+                $seed['period_code']
+            ));
             $orderId = $orderByCode->get($seed['order_code']);
 
             if (! $userId || ! $offering) {

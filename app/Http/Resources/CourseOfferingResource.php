@@ -16,7 +16,6 @@ class CourseOfferingResource extends JsonResource
             'id' => $this->id,
             'course_id' => $this->course_id,
             'academic_period_id' => $this->academic_period_id,
-            'title' => $this->title,
             'capacity' => $this->capacity,
             'price' => $this->price,
             'discount_price' => $this->discount_price,

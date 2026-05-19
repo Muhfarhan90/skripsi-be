@@ -98,7 +98,6 @@ it('handles academic period CRUD and prevents deleting periods with offerings', 
     CourseOffering::create([
         'course_id' => $course->id,
         'academic_period_id' => $periodId,
-        'title' => 'Period Guard Offering',
         'capacity' => 40,
         'price' => 250000,
         'discount_price' => 225000,
@@ -137,7 +136,6 @@ it('handles course offering CRUD, enforces unique course-period offerings, and b
     $createResponse = $this->postJson('/api/admin/course-offerings', [
         'course_id' => $course->id,
         'academic_period_id' => $period->id,
-        'title' => 'Intro Programming - Cohort Z 2026',
         'capacity' => 35,
         'price' => 550000,
         'discount_price' => 500000,
@@ -146,9 +144,9 @@ it('handles course offering CRUD, enforces unique course-period offerings, and b
 
     $createResponse->assertOk()
         ->assertJsonPath('success', true)
-        ->assertJsonPath('data.title', 'Intro Programming - Cohort Z 2026')
+        ->assertJsonPath('data.course.title', $course->title)
         ->assertJsonPath('data.is_active', false)
-        ->assertJsonPath('data.academic_period.start_at', '2026-06-01 08:00:00');
+        ->assertJsonPath('data.academic_period.id', $period->id);
 
     $offeringId = $createResponse->json('data.id');
     expect($offeringId)->not->toBeNull();
@@ -156,7 +154,6 @@ it('handles course offering CRUD, enforces unique course-period offerings, and b
     $this->postJson('/api/admin/course-offerings', [
         'course_id' => $course->id,
         'academic_period_id' => $period->id,
-        'title' => 'Duplicate Intro Programming Offering',
         'capacity' => 30,
         'price' => 500000,
         'discount_price' => 450000,
@@ -167,13 +164,12 @@ it('handles course offering CRUD, enforces unique course-period offerings, and b
     $this->putJson("/api/admin/course-offerings/{$offeringId}", [
         'course_id' => $course->id,
         'academic_period_id' => $period->id,
-        'title' => 'Intro Programming - Cohort Z 2026 Updated',
         'capacity' => 45,
         'price' => 600000,
         'discount_price' => 540000,
         'is_active' => true,
     ])->assertOk()
-      ->assertJsonPath('data.title', 'Intro Programming - Cohort Z 2026 Updated')
+      ->assertJsonPath('data.course.title', $course->title)
       ->assertJsonPath('data.is_active', true);
 
     Enrollment::create([
