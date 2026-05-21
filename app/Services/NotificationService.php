@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Jobs\SendPushNotificationJob;
 use App\Models\Enrollment;
 use App\Models\Notification;
+use App\Models\Order;
 use App\Models\Transaction;
+use App\Models\User;
 
 class NotificationService
 {
@@ -142,6 +144,85 @@ class NotificationService
         ]);
     }
 
+    public function publishOrderPlaced(Order $order, ?Transaction $transaction = null): void
+    {
+        $order->loadMissing('user');
+
+        if (! $order->user) {
+            return;
+        }
+
+        $student = $order->user;
+        $adminRecipients = User::query()
+            ->whereHas('role', function ($query) {
+                $query->where('name', 'admin');
+            })
+            ->get(['id']);
+
+        foreach ($adminRecipients as $adminRecipient) {
+            $this->saveUniqueNotification([
+                'user_id' => $adminRecipient->id,
+                'type' => 'order.placed',
+                'reference_type' => 'order',
+                'reference_id' => $order->id,
+            ], [
+                'title' => 'Order baru dari student',
+                'body' => $student->fullname . ' membuat order ' . $order->order_code . ' dan menunggu tindak lanjut admin.',
+                'data' => [
+                    'order_id' => $order->id,
+                    'order_code' => $order->order_code,
+                    'transaction_id' => $transaction?->id,
+                    'student_id' => $student->id,
+                    'student_name' => $student->fullname,
+                    'route' => '/admin/orders',
+                ],
+                'actor_id' => $student->id,
+                'read_at' => null,
+                'sent_at' => now(),
+            ]);
+        }
+    }
+
+    public function publishManualPaymentSubmitted(Transaction $transaction): void
+    {
+        $transaction->loadMissing('order.user');
+        $order = $transaction->order;
+
+        if (! $order || ! $order->user) {
+            return;
+        }
+
+        $student = $order->user;
+        $adminRecipients = User::query()
+            ->whereHas('role', function ($query) {
+                $query->where('name', 'admin');
+            })
+            ->get(['id']);
+
+        foreach ($adminRecipients as $adminRecipient) {
+            $this->saveUniqueNotification([
+                'user_id' => $adminRecipient->id,
+                'type' => 'payment.submitted',
+                'reference_type' => 'transaction',
+                'reference_id' => $transaction->id,
+            ], [
+                'title' => 'Pembayaran baru perlu direview',
+                'body' => $student->fullname . ' mengirim bukti pembayaran untuk order ' . $order->order_code . '.',
+                'data' => [
+                    'transaction_id' => $transaction->id,
+                    'order_id' => $order->id,
+                    'order_code' => $order->order_code,
+                    'student_id' => $student->id,
+                    'student_name' => $student->fullname,
+                    'route' => '/admin/orders',
+                ],
+                'actor_id' => $student->id,
+                'read_at' => null,
+                'sent_at' => now(),
+            ]);
+        }
+    }
+
     private function saveUniqueNotification(array $identity, array $payload): Notification
     {
         $notification = Notification::query()->firstOrNew($identity);
@@ -152,6 +233,7 @@ class NotificationService
                 'body' => $payload['body'],
                 'data' => $payload['data'] ?? null,
                 'actor_id' => $payload['actor_id'] ?? $notification->actor_id,
+                'read_at' => array_key_exists('read_at', $payload) ? $payload['read_at'] : $notification->read_at,
                 'sent_at' => $payload['sent_at'] ?? $notification->sent_at,
             ]);
         } else {

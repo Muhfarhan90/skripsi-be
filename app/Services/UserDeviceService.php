@@ -39,12 +39,16 @@ class UserDeviceService
         });
     }
 
-    public function deactivateByDeviceId(User $user, string $deviceId): UserDevice
+    public function deactivateByDeviceId(User $user, string $deviceId): ?UserDevice
     {
         $device = UserDevice::query()
             ->where('user_id', $user->id)
             ->where('device_id', $deviceId)
-            ->firstOrFail();
+            ->first();
+
+        if (! $device) {
+            return null;
+        }
 
         $device->update([
             'is_active' => false,

@@ -32,6 +32,14 @@ class UserDeviceController extends Controller
     {
         $device = $this->service->deactivateByDeviceId($request->user(), $deviceId);
 
+        if (! $device) {
+            return response()->json([
+                'success' => true,
+                'message' => 'User device was already inactive or not registered',
+                'data' => null,
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'User device deactivated successfully',

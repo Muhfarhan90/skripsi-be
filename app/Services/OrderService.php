@@ -121,13 +121,18 @@ class OrderService
     |--------------------------------------------------------------------------
     */
 
-    public function getAllForStudent(int $userId)
+    public function getAllForStudent(int $userId, int $perPage = 10, ?string $status = null)
     {
+        $perPage = max($perPage, 1);
+
         return Order::with(['items.courseOffering.course', 'transactions', 'voucher'])
             ->where('user_id', $userId)
             ->where('status', '!=', 'cart')
+            ->when($status !== null && $status !== '', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
             ->latest()
-            ->paginate(10);
+            ->paginate($perPage);
     }
 
     public function findByIdForStudent(int $id, int $userId)
@@ -275,7 +280,7 @@ class OrderService
             $cart->status = 'pending';
             $cart->save();
 
-            $this->transactionService->create([
+            $transaction = $this->transactionService->create([
                 'order_id' => $cart->id,
                 'amount' => $cart->grand_total,
                 'status' => 'pending',
@@ -284,6 +289,8 @@ class OrderService
                 'payment_proof' => $data['payment_proof'] ?? null,
                 'paid_at' => null,
             ]);
+
+            $this->notificationService->publishOrderPlaced($cart->fresh('user'), $transaction->fresh());
 
             return $this->freshOrderWithRelations($cart->id);
         });
@@ -312,6 +319,8 @@ class OrderService
                 'payment_reference' => $data['payment_reference'] ?? $transaction->payment_reference,
                 'payment_proof' => $data['payment_proof'] ?? $transaction->payment_proof,
             ]);
+
+            $this->notificationService->publishManualPaymentSubmitted($transaction->fresh());
 
             return $this->freshOrderWithRelations($order->id);
         });

@@ -58,6 +58,9 @@ class FcmServiceTest extends TestCase
                 && $request->hasHeader('Authorization', 'Bearer fake-access-token')
                 && data_get($request->data(), 'message.token') === $device->fcm_token
                 && data_get($request->data(), 'message.notification.title') === 'Pembayaran berhasil'
+                && data_get($request->data(), 'message.webpush.headers.Urgency') === 'high'
+                && data_get($request->data(), 'message.webpush.notification.title') === 'Pembayaran berhasil'
+                && data_get($request->data(), 'message.webpush.notification.badge') === '/globe.svg'
                 && data_get($request->data(), 'message.webpush.fcm_options.link') === 'https://skripsi.test/student/orders/44'
                 && data_get($request->data(), 'message.data.order_id') === '44';
         });
@@ -114,6 +117,51 @@ class FcmServiceTest extends TestCase
         Http::assertSentCount(1);
         $this->assertFalse((bool) $device->fresh()->is_active);
         $this->assertNotNull($device->fresh()->last_seen_at);
+    }
+
+    public function test_it_omits_webpush_link_for_non_https_frontend_urls(): void
+    {
+        config()->set('app.frontend_url', 'http://localhost:3000');
+
+        Http::fake([
+            'https://fcm.googleapis.com/*' => Http::response([
+                'name' => 'projects/skripsi-1e41d/messages/456',
+            ], 200),
+        ]);
+
+        $user = $this->createUser();
+        UserDevice::query()->create([
+            'user_id' => $user->id,
+            'device_id' => 'web-device-3',
+            'device_type' => 'web',
+            'fcm_token' => 'token-3',
+            'is_active' => true,
+            'last_seen_at' => null,
+        ]);
+
+        $notification = Notification::query()->create([
+            'user_id' => $user->id,
+            'type' => 'payment.success',
+            'title' => 'Pembayaran berhasil',
+            'body' => 'Pesanan Anda sudah diproses.',
+            'reference_type' => 'transaction',
+            'reference_id' => 88,
+            'data' => [
+                'order_id' => 88,
+                'route' => '/student/orders/88',
+            ],
+            'sent_at' => now(),
+        ]);
+
+        $service = new FcmService($this->fakeAccessTokenService());
+        $service->sendNotification($notification);
+
+        Http::assertSent(function ($request) {
+            return data_get($request->data(), 'message.webpush.headers.Urgency') === 'high'
+                && data_get($request->data(), 'message.webpush.notification.title') === 'Pembayaran berhasil'
+                && data_get($request->data(), 'message.webpush.fcm_options.link') === null
+                && data_get($request->data(), 'message.data.route') === '/student/orders/88';
+        });
     }
 
     private function fakeAccessTokenService(): FirebaseAccessTokenService

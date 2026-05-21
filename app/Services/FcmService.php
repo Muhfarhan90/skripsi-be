@@ -98,6 +98,20 @@ class FcmService
      */
     private function buildMessagePayload(Notification $notification, UserDevice $device): array
     {
+        $webpushConfig = [
+            'headers' => [
+                'Urgency' => 'high',
+            ],
+            'notification' => [
+                'title' => $notification->title,
+                'body' => $notification->body,
+                'icon' => '/globe.svg',
+                'badge' => '/globe.svg',
+                'tag' => sprintf('notification-%s', $notification->id),
+                'renotify' => false,
+            ],
+        ];
+
         $message = [
             'token' => $device->fcm_token,
             'notification' => [
@@ -105,14 +119,13 @@ class FcmService
                 'body' => $notification->body,
             ],
             'data' => $this->buildDataPayload($notification),
+            'webpush' => $webpushConfig,
         ];
 
         $clickUrl = $this->resolveClickUrl($notification);
         if ($clickUrl) {
-            $message['webpush'] = [
-                'fcm_options' => [
-                    'link' => $clickUrl,
-                ],
+            $message['webpush']['fcm_options'] = [
+                'link' => $clickUrl,
             ];
         }
 
@@ -178,16 +191,18 @@ class FcmService
         $route = data_get($notification->data, 'route');
 
         if (is_string($route) && $route !== '') {
-            if (str_starts_with($route, 'http://') || str_starts_with($route, 'https://')) {
+            if (str_starts_with($route, 'https://')) {
                 return $route;
             }
 
             if ($baseUrl !== '') {
-                return $baseUrl . '/' . ltrim($route, '/');
+                $candidateUrl = $baseUrl . '/' . ltrim($route, '/');
+
+                return str_starts_with($candidateUrl, 'https://') ? $candidateUrl : null;
             }
         }
 
-        return $baseUrl !== '' ? $baseUrl : null;
+        return str_starts_with($baseUrl, 'https://') ? $baseUrl : null;
     }
 
     private function shouldDeactivateDevice(Response $response): bool
