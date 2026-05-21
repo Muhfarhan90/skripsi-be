@@ -20,7 +20,16 @@ class OrderController extends Controller
 
     public function index(Request $request)
     {
-        $orders = $this->service->getAllForStudent($request->user()->id);
+        $validated = $request->validate([
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'status' => ['nullable', 'string', 'in:pending,completed,cancelled'],
+        ]);
+
+        $orders = $this->service->getAllForStudent(
+            (int) $request->user()->id,
+            (int) ($validated['per_page'] ?? 10),
+            $validated['status'] ?? null,
+        );
 
         return response()->json([
             'success' => true,

@@ -21,14 +21,38 @@ class TransactionService
         $this->notificationService = $notificationService;
     }
 
-    public function getAll()
+    public function getAllForAdmin(string $search = '', int $perPage = 10, ?string $status = null)
     {
-        return Transaction::latest()->paginate(10);
+        $perPage = max($perPage, 1);
+
+        return Transaction::query()
+            ->with(['order.user'])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('invoice_code', 'like', "%{$search}%")
+                        ->orWhere('payment_reference', 'like', "%{$search}%")
+                        ->orWhere('payment_method', 'like', "%{$search}%")
+                        ->orWhere('payment_channel', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhereHas('order', function ($orderQuery) use ($search) {
+                            $orderQuery->where('order_code', 'like', "%{$search}%")
+                                ->orWhereHas('user', function ($userQuery) use ($search) {
+                                    $userQuery->where('fullname', 'like', "%{$search}%")
+                                        ->orWhere('email', 'like', "%{$search}%");
+                                });
+                        });
+                });
+            })
+            ->when($status !== null && $status !== '', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->latest()
+            ->paginate($perPage);
     }
 
     public function findById(int $id)
     {
-        return Transaction::findOrFail($id);
+        return Transaction::with(['order.user'])->findOrFail($id);
     }
 
     public function create(array $data)
@@ -98,7 +122,7 @@ class TransactionService
                 $this->notificationService->publishTransactionFailed($transaction->fresh());
             }
 
-            return $transaction->fresh();
+            return $this->findById($transaction->id);
         });
     }
 

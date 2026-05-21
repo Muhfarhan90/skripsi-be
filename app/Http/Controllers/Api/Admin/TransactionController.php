@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\Transaction\StoreTransactionRequest;
 use App\Http\Requests\Admin\Transaction\UpdateTransactionRequest;
 use App\Http\Resources\TransactionResource;
 use App\Services\TransactionService;
+use Illuminate\Http\Request;
 
 class TransactionController extends Controller
 {
@@ -17,9 +18,16 @@ class TransactionController extends Controller
         $this->service = $transactionService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $transaction = $this->service->getAll();
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 10);
+        $status = trim((string) $request->query('status', ''));
+        $transaction = $this->service->getAllForAdmin(
+            $search,
+            $perPage,
+            $status !== '' ? $status : null
+        );
 
         return response()->json([
             'success' => true,
