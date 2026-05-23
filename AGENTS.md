@@ -58,7 +58,7 @@ php -l routes/api.php
   - dipakai lebih dari sekali, atau
   - benar-benar membuat method utama lebih jelas.
 - Hindari method helper yang hanya membungkus satu baris query jika tidak menambah kejelasan.
-- Nama method harus menjelaskan intent bisnis (contoh: `checkoutCart`, `activateOrderEnrollments`).
+- Nama method harus menjelaskan intent bisnis (contoh: `create`, `activateOrderEnrollments`).
 - Jangan ubah flow yang sudah stabil tanpa alasan jelas dan catatan di PR/report.
 
 ## Import and Namespace Rules
@@ -85,7 +85,7 @@ php -l routes/api.php
   - cek route API jika ada perubahan route/middleware
   - jalankan test suite (`php artisan test`) jika environment mendukung
 - Untuk fitur order/payment:
-  - verifikasi state transition `cart -> pending -> completed/cancelled`
+  - verifikasi state transition `pending -> completed/cancelled`
   - verifikasi enrollment aktif saat transaksi sukses
   - verifikasi student tidak bisa akses endpoint admin
 - Saat hasil test gagal karena environment (contoh extension DB tidak tersedia), catat jelas penyebabnya.
