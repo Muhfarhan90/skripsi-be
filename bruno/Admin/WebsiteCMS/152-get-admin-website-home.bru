@@ -1,0 +1,25 @@
+meta {
+  name: GET admin website home
+  type: http
+  seq: 152
+}
+
+get {
+  url: {{baseUrl}}/admin/website/home
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/website/home
+  Action: App\Http\Controllers\Api\Admin\WebsiteSettingController@home
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

@@ -1,0 +1,25 @@
+meta {
+  name: GET admin website pages
+  type: http
+  seq: 153
+}
+
+get {
+  url: {{baseUrl}}/admin/website-pages
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/website-pages
+  Action: App\Http\Controllers\Api\Admin\WebsitePageController@index
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

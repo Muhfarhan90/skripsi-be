@@ -1,0 +1,35 @@
+meta {
+  name: POST admin faq
+  type: http
+  seq: 160
+}
+
+post {
+  url: {{baseUrl}}/admin/faqs
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "question": "Apakah course bisa diakses lewat HP?",
+    "answer": "Bisa. Landing page dan area belajar dibuat responsif sehingga bisa diakses melalui browser mobile.",
+    "faq_category_id": 1,
+    "sort_order": 1,
+    "is_active": true
+  }
+}
+
+docs {
+  URI: api/admin/faqs
+  Action: App\Http\Controllers\Api\Admin\FaqController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

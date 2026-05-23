@@ -1,0 +1,38 @@
+meta {
+  name: PUT admin website settings
+  type: http
+  seq: 151
+}
+
+put {
+  url: {{baseUrl}}/admin/website-settings
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "site_name": "Skripsi Akademi",
+    "site_tagline": "Platform Belajar Pre-University",
+    "logo_url": "https://example.com/logo.png",
+    "footer_text": "Copyright {year} {site_name}",
+    "contact_email": "hello@example.com",
+    "contact_phone": "+628123456789",
+    "address": "Jakarta, Indonesia"
+  }
+}
+
+docs {
+  URI: api/admin/website-settings
+  Action: App\Http\Controllers\Api\Admin\WebsiteSettingController@update
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

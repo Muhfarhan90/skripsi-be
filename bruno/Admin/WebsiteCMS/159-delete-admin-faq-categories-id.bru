@@ -1,0 +1,25 @@
+meta {
+  name: DELETE admin faq category
+  type: http
+  seq: 159
+}
+
+delete {
+  url: {{baseUrl}}/admin/faq-categories/1
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/faq-categories/{id}
+  Action: App\Http\Controllers\Api\Admin\FaqCategoryController@destroy
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

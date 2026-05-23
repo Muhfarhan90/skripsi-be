@@ -1,0 +1,35 @@
+meta {
+  name: PUT admin faq
+  type: http
+  seq: 161
+}
+
+put {
+  url: {{baseUrl}}/admin/faqs/1
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "question": "Apakah course bisa diakses lewat HP?",
+    "answer": "Bisa. Platform dioptimalkan untuk perangkat mobile.",
+    "faq_category_id": 1,
+    "sort_order": 1,
+    "is_active": true
+  }
+}
+
+docs {
+  URI: api/admin/faqs/{id}
+  Action: App\Http\Controllers\Api\Admin\FaqController@update
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

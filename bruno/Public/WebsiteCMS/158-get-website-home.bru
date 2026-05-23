@@ -1,0 +1,21 @@
+meta {
+  name: GET website home
+  type: http
+  seq: 158
+}
+
+get {
+  url: {{baseUrl}}/website/home
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  URI: api/website/home
+  Action: App\Http\Controllers\Api\WebsiteSettingController@home
+  Middleware: api
+}

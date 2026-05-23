@@ -1,0 +1,21 @@
+meta {
+  name: GET website faqs
+  type: http
+  seq: 160
+}
+
+get {
+  url: {{baseUrl}}/website/faqs
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  URI: api/website/faqs
+  Action: App\Http\Controllers\Api\WebsiteSettingController@faqs
+  Middleware: api
+}

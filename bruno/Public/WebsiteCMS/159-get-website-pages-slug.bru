@@ -1,0 +1,21 @@
+meta {
+  name: GET website pages slug
+  type: http
+  seq: 159
+}
+
+get {
+  url: {{baseUrl}}/website/pages/about-us
+  body: none
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  URI: api/website/pages/{slug}
+  Action: App\Http\Controllers\Api\WebsiteSettingController@page
+  Middleware: api
+}

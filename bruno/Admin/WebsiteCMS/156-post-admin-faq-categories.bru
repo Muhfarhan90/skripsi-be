@@ -1,0 +1,33 @@
+meta {
+  name: POST admin faq categories
+  type: http
+  seq: 156
+}
+
+post {
+  url: {{baseUrl}}/admin/faq-categories
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Payment",
+    "is_active": true
+  }
+}
+
+docs {
+  URI: api/admin/faq-categories
+  Action: App\Http\Controllers\Api\Admin\FaqCategoryController@store
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

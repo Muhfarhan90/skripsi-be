@@ -1,0 +1,25 @@
+meta {
+  name: DELETE admin faq
+  type: http
+  seq: 162
+}
+
+delete {
+  url: {{baseUrl}}/admin/faqs/1
+  body: none
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/faqs/{id}
+  Action: App\Http\Controllers\Api\Admin\FaqController@destroy
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}
