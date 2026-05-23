@@ -31,6 +31,7 @@ class CourseResource extends JsonResource
             'category_name' => $this->relationLoaded('category') ? $this->category?->name : null,
             'instructor_id' => $this->instructor_id,
             'instructor_name' => $this->relationLoaded('instructor') ? $this->instructor?->fullname : null,
+            'instructor_bio' => $this->relationLoaded('instructor') ? $this->instructor?->bio : null,
             'course_offering_id' => $catalogOffering?->id,
             'price' => $catalogOffering?->price,
             'discount_price' => $catalogOffering?->discount_price,
