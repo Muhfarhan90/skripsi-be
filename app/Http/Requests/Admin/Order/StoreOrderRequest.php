@@ -20,7 +20,7 @@ class StoreOrderRequest extends FormRequest
             'course_ids' => ['required_without:course_offering_ids', 'array', 'min:1'],
             'course_ids.*' => ['integer', 'exists:courses,id'],
             'payment_method' => ['nullable', 'string', 'in:manual,gateway'],
-            'status' => ['nullable', 'string', 'in:cart,pending,completed,cancelled'],
+            'status' => ['nullable', 'string', 'in:pending,completed,cancelled'],
             'voucher_code' => ['nullable', 'string', 'exists:vouchers,code'],
         ];
     }

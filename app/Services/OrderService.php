@@ -143,159 +143,6 @@ class OrderService
             ->findOrFail($id);
     }
 
-    public function getCartForStudent(int $userId): ?Order
-    {
-        return Order::with(['items.courseOffering.course', 'transactions', 'voucher'])
-            ->where('user_id', $userId)
-            ->where('status', 'cart')
-            ->latest()
-            ->first();
-    }
-
-    public function addCourseToCart(int $userId, ?int $courseOfferingId, ?int $courseId = null): Order
-    {
-        return DB::transaction(function () use ($userId, $courseOfferingId, $courseId) {
-            $resolvedOfferingId = $this->resolveRequestedOfferingId($courseOfferingId, $courseId);
-            $offering = CourseOffering::with('course')->findOrFail($resolvedOfferingId);
-
-            $this->ensureOfferingPurchasable($userId, $offering->id);
-
-            $cart = $this->lockCartForUser($userId, true);
-            if (! $cart) {
-                throw new \RuntimeException('Failed to initialize cart');
-            }
-
-            $alreadyInCart = $cart->items()
-                ->where('course_offering_id', $offering->id)
-                ->exists();
-
-            if ($alreadyInCart) {
-                throw ValidationException::withMessages([
-                    'course_offering_id' => ['Course offering already exists in cart'],
-                ]);
-            }
-
-            $price = $this->resolveOfferingSellingPrice($offering);
-            $cart->items()->create([
-                'course_offering_id' => $offering->id,
-                'price' => $price,
-            ]);
-
-            $this->recalculateCartTotals($cart);
-
-            return $this->freshOrderWithRelations($cart->id);
-        });
-    }
-
-    public function removeCourseFromCart(int $userId, int $itemId): ?Order
-    {
-        return DB::transaction(function () use ($userId, $itemId) {
-            $cart = $this->lockCartForUser($userId, false);
-            if (! $cart) {
-                return null;
-            }
-
-            $deleted = $cart->items()->where('course_offering_id', $itemId)->delete();
-
-            if ($deleted === 0) {
-                throw ValidationException::withMessages([
-                    'course_offering_id' => ['Course offering not found in cart'],
-                ]);
-            }
-
-            $hasItems = $cart->items()->exists();
-            if (! $hasItems) {
-                $cart->delete();
-                return null;
-            }
-
-            $this->recalculateCartTotals($cart);
-
-            return $this->freshOrderWithRelations($cart->id);
-        });
-    }
-
-    public function applyVoucherToCart(int $userId, string $voucherCode): Order
-    {
-        return DB::transaction(function () use ($userId, $voucherCode) {
-            $cart = $this->lockCartForUser($userId, false);
-            if (! $cart) {
-                throw ValidationException::withMessages([
-                    'cart' => ['Cart is empty'],
-                ]);
-            }
-
-            $cart->load(['items.courseOffering.course', 'voucher']);
-            if ($cart->items->isEmpty()) {
-                throw ValidationException::withMessages([
-                    'cart' => ['Cart is empty'],
-                ]);
-            }
-
-            $subtotal = $this->refreshCartItemPrices($cart, $userId);
-            $voucherPricing = $this->resolveVoucherPricing($voucherCode, $subtotal);
-
-            $cart->voucher_id = $voucherPricing['voucher_id'];
-            $cart->subtotal = $subtotal;
-            $cart->discount = $voucherPricing['discount'];
-            $cart->grand_total = max(0, $subtotal - $voucherPricing['discount']);
-            $cart->save();
-
-            return $this->freshOrderWithRelations($cart->id);
-        });
-    }
-
-    public function checkoutCart(int $userId, array $data): Order
-    {
-        return DB::transaction(function () use ($userId, $data) {
-            $cart = $this->lockCartForUser($userId, false);
-            if (! $cart) {
-                throw ValidationException::withMessages([
-                    'cart' => ['Cart is empty'],
-                ]);
-            }
-
-            $cart->load(['items.courseOffering.course', 'voucher']);
-            if ($cart->items->isEmpty()) {
-                throw ValidationException::withMessages([
-                    'cart' => ['Cart is empty'],
-                ]);
-            }
-
-            $subtotal = $this->refreshCartItemPrices($cart, $userId);
-            $voucherCode = array_key_exists('voucher_code', $data)
-                ? ($data['voucher_code'] ?? null)
-                : $cart->voucher?->code;
-            $voucherPricing = $this->resolveVoucherPricing($voucherCode, $subtotal);
-            $discount = $voucherPricing['discount'];
-            $voucherId = $voucherPricing['voucher_id'];
-
-            $grandTotal = max(0, $subtotal - $discount);
-
-            $cart->voucher_id = $voucherId;
-            $cart->subtotal = $subtotal;
-            $cart->discount = $discount;
-            $cart->note = $data['note'] ?? null;
-            $cart->grand_total = $grandTotal;
-            $cart->status = 'pending';
-            $cart->save();
-
-            $transaction = $this->transactionService->create([
-                'order_id' => $cart->id,
-                'amount' => $cart->grand_total,
-                'status' => 'pending',
-                'payment_method' => $data['payment_method'] ?? 'manual',
-                'payment_reference' => $data['payment_reference'] ?? null,
-                'payment_proof' => $data['payment_proof'] ?? null,
-                'paid_at' => null,
-            ]);
-
-            $this->notificationService->publishOrderPlaced($cart->fresh('user'), $transaction->fresh());
-
-            return $this->freshOrderWithRelations($cart->id);
-        });
-    }
-
     public function submitPaymentByStudent(int $userId, int $orderId, array $data): Order
     {
         return DB::transaction(function () use ($userId, $orderId, $data) {
@@ -397,16 +244,22 @@ class OrderService
                 $order->items()->create($item);
             }
 
-            $transaction = null;
+            $transaction = $this->transactionService->create([
+                'order_id' => $order->id,
+                'amount' => $order->grand_total,
+                'status' => match ($status) {
+                    'completed' => 'success',
+                    'cancelled' => 'failed',
+                    default => 'pending',
+                },
+                'payment_method' => $paymentMethod,
+                'payment_reference' => $data['payment_reference'] ?? null,
+                'payment_proof' => $data['payment_proof'] ?? null,
+                'paid_at' => $status === 'completed' ? now() : null,
+            ]);
 
-            if ($status !== 'cart') {
-                $transaction = $this->transactionService->create([
-                    'order_id' => $order->id,
-                    'amount' => $order->grand_total,
-                    'status' => $status === 'completed' ? 'success' : 'pending',
-                    'payment_method' => $paymentMethod,
-                    'paid_at' => $status === 'completed' ? now() : null,
-                ]);
+            if ($status === 'pending' && $transaction) {
+                $this->notificationService->publishOrderPlaced($order->fresh('user'), $transaction->fresh());
             }
 
             if ($status === 'completed') {
@@ -489,6 +342,14 @@ class OrderService
 
     private function normalizeRequestedOfferingIds(array $data): array
     {
+        if (! empty($data['course_offering_id'])) {
+            return [(int) $data['course_offering_id']];
+        }
+
+        if (! empty($data['course_id'])) {
+            return [$this->resolvePurchasableOfferingIdByCourse((int) $data['course_id'])];
+        }
+
         if (! empty($data['course_offering_ids']) && is_array($data['course_offering_ids'])) {
             return array_values(array_unique(array_map('intval', $data['course_offering_ids'])));
         }
@@ -503,21 +364,6 @@ class OrderService
         }
 
         return [];
-    }
-
-    private function resolveRequestedOfferingId(?int $courseOfferingId, ?int $courseId): int
-    {
-        if ($courseOfferingId !== null && $courseOfferingId > 0) {
-            return $courseOfferingId;
-        }
-
-        if ($courseId !== null && $courseId > 0) {
-            return $this->resolvePurchasableOfferingIdByCourse($courseId);
-        }
-
-        throw ValidationException::withMessages([
-            'course_offering_id' => ['course_offering_id or course_id is required'],
-        ]);
     }
 
     private function resolvePurchasableOfferingIdByCourse(int $courseId): int
@@ -670,96 +516,6 @@ class OrderService
                 'course_offering_id' => ["User already has pending or completed order for offering ID: {$offeringId}"],
             ]);
         }
-    }
-
-    private function lockCartForUser(int $userId, bool $createIfMissing): ?Order
-    {
-        $carts = Order::where('user_id', $userId)
-            ->where('status', 'cart')
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->get();
-
-        $cart = $carts->first();
-        if ($cart && $carts->count() > 1) {
-            foreach ($carts->slice(1) as $duplicateCart) {
-                $duplicateCart->delete();
-            }
-        }
-
-        if (! $cart && $createIfMissing) {
-            $cart = Order::create([
-                'user_id' => $userId,
-                'voucher_id' => null,
-                'order_code' => $this->generateOrderCode(),
-                'subtotal' => 0,
-                'discount' => 0,
-                'grand_total' => 0,
-                'status' => 'cart',
-            ]);
-        }
-
-        return $cart;
-    }
-
-    private function recalculateCartTotals(Order $cart): void
-    {
-        $subtotal = (float) $cart->items()->sum('price');
-        $cart->voucher_id = null;
-        $cart->discount = 0;
-        $cart->subtotal = $subtotal;
-        $cart->grand_total = $subtotal;
-        $cart->save();
-    }
-
-    private function refreshCartItemPrices(Order $cart, int $userId): float
-    {
-        $subtotal = 0;
-
-        foreach ($cart->items as $item) {
-            $offering = $this->resolveOfferingForOrderItem($item);
-            $this->ensureOfferingPurchasable($userId, $offering->id, (int) $cart->id);
-
-            $latestPrice = $this->resolveOfferingSellingPrice($offering);
-            if (
-                (float) $item->price !== (float) $latestPrice
-                || (int) ($item->course_offering_id ?? 0) !== (int) $offering->id
-            ) {
-                $item->update([
-                    'course_offering_id' => $offering->id,
-                    'price' => $latestPrice,
-                ]);
-            }
-
-            $subtotal += $latestPrice;
-        }
-
-        return $subtotal;
-    }
-
-    private function resolveVoucherPricing(?string $voucherCode, float $subtotal): array
-    {
-        $normalizedVoucherCode = trim((string) $voucherCode);
-        if ($normalizedVoucherCode === '') {
-            return [
-                'voucher_id' => null,
-                'discount' => 0,
-            ];
-        }
-
-        $voucher = Voucher::where('code', $normalizedVoucherCode)->first();
-        if (! $voucher) {
-            throw ValidationException::withMessages([
-                'voucher_code' => ['Voucher code is invalid'],
-            ]);
-        }
-
-        $discountData = $this->applyVoucher($voucher, $subtotal);
-
-        return [
-            'voucher_id' => $voucher->id,
-            'discount' => $discountData['discount'],
-        ];
     }
 
     public function activateOrderEnrollments(Order $order): Collection
