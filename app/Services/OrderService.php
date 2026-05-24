@@ -7,6 +7,7 @@ use App\Models\Enrollment;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Voucher;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -33,21 +34,14 @@ class OrderService
     {
         $perPage = max($perPage, 1);
 
-        return Order::query()
-            ->with(['user', 'items.courseOffering.course', 'voucher', 'transactions'])
-            ->where('status', '!=', 'cart')
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($builder) use ($search) {
-                    $builder->where('order_code', 'like', "%{$search}%")
-                        ->orWhere('status', 'like', "%{$search}%")
-                        ->orWhereHas('user', function ($userQuery) use ($search) {
-                            $userQuery->where('fullname', 'like', "%{$search}%")
-                                ->orWhere('email', 'like', "%{$search}%");
-                        });
-                });
-            })
-            ->latest()
-            ->paginate($perPage);
+        return $this->buildAdminListQuery($search)->paginate($perPage);
+    }
+
+    public function getAdminExportRows(string $search = ''): Collection
+    {
+        return $this->buildAdminListQuery($search)
+            ->get()
+            ->map(fn (Order $order) => $this->mapOrderForAdminExport($order));
     }
 
     public function findByIdForAdmin(int $id)
@@ -598,5 +592,77 @@ class OrderService
         }
 
         return $basePrice;
+    }
+
+    private function buildAdminListQuery(string $search = ''): Builder
+    {
+        return Order::query()
+            ->with(['user', 'items.courseOffering.course', 'voucher', 'transactions'])
+            ->where('status', '!=', 'cart')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('order_code', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($userQuery) use ($search) {
+                            $userQuery->where('fullname', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest();
+    }
+
+    private function mapOrderForAdminExport(Order $order): array
+    {
+        $latestTransaction = $order->transactions->sortByDesc('id')->first();
+        $courseTitles = $order->items
+            ->map(fn (OrderItem $item) => $item->courseOffering?->course?->title)
+            ->filter(fn (?string $title) => filled($title))
+            ->implode(' | ');
+
+        $paymentMethod = collect([
+            $latestTransaction?->payment_method,
+            $latestTransaction?->payment_channel,
+        ])->filter(fn (?string $value) => filled($value))->implode(' / ');
+
+        $paymentReference = $latestTransaction?->payment_reference
+            ?: $latestTransaction?->external_id
+            ?: $latestTransaction?->invoice_code
+            ?: '';
+
+        return [
+            'Kode Order' => $order->order_code,
+            'Tanggal Order' => $this->formatAdminExportDate($order->created_at),
+            'Status Order' => $order->status,
+            'Nama Siswa' => $order->user?->fullname ?? '',
+            'Email Siswa' => $order->user?->email ?? '',
+            'Jumlah Item' => (string) $order->items->count(),
+            'Daftar Course' => $courseTitles,
+            'Kode Voucher' => $order->voucher?->code ?? '',
+            'Subtotal (IDR)' => $this->formatAdminExportAmount($order->subtotal),
+            'Diskon (IDR)' => $this->formatAdminExportAmount($order->discount),
+            'Total Bayar (IDR)' => $this->formatAdminExportAmount($order->grand_total),
+            'Status Pembayaran Terakhir' => $latestTransaction?->status ?? '',
+            'Metode Pembayaran Terakhir' => $paymentMethod,
+            'Invoice Terakhir' => $latestTransaction?->invoice_code ?? '',
+            'Referensi Pembayaran Terakhir' => $paymentReference,
+            'Bukti Pembayaran Terakhir' => $latestTransaction?->payment_proof ?? '',
+            'Dibayar Pada' => $this->formatAdminExportDate($latestTransaction?->paid_at),
+            'Catatan' => $order->note ?? '',
+        ];
+    }
+
+    private function formatAdminExportDate(?Carbon $value): string
+    {
+        if (! $value) {
+            return '';
+        }
+
+        return $value->copy()->timezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+    }
+
+    private function formatAdminExportAmount(float|int|string|null $value): string
+    {
+        return number_format((float) ($value ?? 0), 0, '.', '');
     }
 }

@@ -146,10 +146,12 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::delete('/questions/{questionId}/options/{optionId}', [OptionController::class, 'destroyForQuestion']);
 
     Route::get('/enrollments', [AdminEnrollmentController::class, 'index']);
+    Route::get('/orders/export', [AdminOrderController::class, 'export']);
     Route::get('/orders', [AdminOrderController::class, 'index']);
     Route::post('/orders', [AdminOrderController::class, 'store']);
     Route::get('/orders/{id}', [AdminOrderController::class, 'show']);
     Route::patch('/orders/{id}/status', [AdminOrderController::class, 'updateStatus']);
+    Route::get('/transactions/export', [TransactionController::class, 'export']);
 
     Route::get('/enrollments/{id}', [AdminEnrollmentController::class, 'show']);
     Route::get('/courses/{courseId}/enrollments', [AdminEnrollmentController::class, 'byCourse']);

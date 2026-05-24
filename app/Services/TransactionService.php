@@ -7,6 +7,7 @@ use App\Models\Enrollment;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Transaction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,29 +26,14 @@ class TransactionService
     {
         $perPage = max($perPage, 1);
 
-        return Transaction::query()
-            ->with(['order.user'])
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($builder) use ($search) {
-                    $builder->where('invoice_code', 'like', "%{$search}%")
-                        ->orWhere('payment_reference', 'like', "%{$search}%")
-                        ->orWhere('payment_method', 'like', "%{$search}%")
-                        ->orWhere('payment_channel', 'like', "%{$search}%")
-                        ->orWhere('status', 'like', "%{$search}%")
-                        ->orWhereHas('order', function ($orderQuery) use ($search) {
-                            $orderQuery->where('order_code', 'like', "%{$search}%")
-                                ->orWhereHas('user', function ($userQuery) use ($search) {
-                                    $userQuery->where('fullname', 'like', "%{$search}%")
-                                        ->orWhere('email', 'like', "%{$search}%");
-                                });
-                        });
-                });
-            })
-            ->when($status !== null && $status !== '', function ($query) use ($status) {
-                $query->where('status', $status);
-            })
-            ->latest()
-            ->paginate($perPage);
+        return $this->buildAdminListQuery($search, $status)->paginate($perPage);
+    }
+
+    public function getAdminExportRows(string $search = '', ?string $status = null): Collection
+    {
+        return $this->buildAdminListQuery($search, $status)
+            ->get()
+            ->map(fn (Transaction $transaction) => $this->mapTransactionForAdminExport($transaction));
     }
 
     public function findById(int $id)
@@ -231,5 +217,73 @@ class TransactionService
         }
 
         return 'active';
+    }
+
+    private function buildAdminListQuery(string $search = '', ?string $status = null): Builder
+    {
+        return Transaction::query()
+            ->with(['order.user'])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($builder) use ($search) {
+                    $builder->where('invoice_code', 'like', "%{$search}%")
+                        ->orWhere('payment_reference', 'like', "%{$search}%")
+                        ->orWhere('payment_method', 'like', "%{$search}%")
+                        ->orWhere('payment_channel', 'like', "%{$search}%")
+                        ->orWhere('status', 'like', "%{$search}%")
+                        ->orWhereHas('order', function ($orderQuery) use ($search) {
+                            $orderQuery->where('order_code', 'like', "%{$search}%")
+                                ->orWhereHas('user', function ($userQuery) use ($search) {
+                                    $userQuery->where('fullname', 'like', "%{$search}%")
+                                        ->orWhere('email', 'like', "%{$search}%");
+                                });
+                        });
+                });
+            })
+            ->when($status !== null && $status !== '', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->latest();
+    }
+
+    private function mapTransactionForAdminExport(Transaction $transaction): array
+    {
+        $paymentMethod = collect([
+            $transaction->payment_method,
+            $transaction->payment_channel,
+        ])->filter(fn (?string $value) => filled($value))->implode(' / ');
+
+        $paymentReference = $transaction->payment_reference
+            ?: $transaction->external_id
+            ?: $transaction->invoice_code;
+
+        return [
+            'Kode Invoice' => $transaction->invoice_code,
+            'Tanggal Transaksi' => $this->formatAdminExportDate($transaction->created_at),
+            'Status Transaksi' => $transaction->status,
+            'Nominal (IDR)' => $this->formatAdminExportAmount($transaction->amount),
+            'Metode Pembayaran' => $paymentMethod,
+            'Referensi Pembayaran' => $paymentReference,
+            'Order Code' => $transaction->order?->order_code ?? '',
+            'Status Order' => $transaction->order?->status ?? '',
+            'Nama Siswa' => $transaction->order?->user?->fullname ?? '',
+            'Email Siswa' => $transaction->order?->user?->email ?? '',
+            'Bukti Pembayaran' => $transaction->payment_proof ?? '',
+            'Dibayar Pada' => $this->formatAdminExportDate($transaction->paid_at),
+            'Kedaluwarsa Pada' => $this->formatAdminExportDate($transaction->expired_at),
+        ];
+    }
+
+    private function formatAdminExportDate(?Carbon $value): string
+    {
+        if (! $value) {
+            return '';
+        }
+
+        return $value->copy()->timezone('Asia/Jakarta')->format('Y-m-d H:i:s');
+    }
+
+    private function formatAdminExportAmount(float|int|string|null $value): string
+    {
+        return number_format((float) ($value ?? 0), 0, '.', '');
     }
 }

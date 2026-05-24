@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\Transaction\UpdateTransactionRequest;
 use App\Http\Resources\TransactionResource;
 use App\Services\TransactionService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class TransactionController extends Controller
 {
@@ -40,6 +41,36 @@ class TransactionController extends Controller
                 'total' => $transaction->total(),
             ],
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $search = trim((string) $request->query('search', ''));
+        $status = trim((string) $request->query('status', ''));
+        $rows = $this->service->getAdminExportRows(
+            $search,
+            $status !== '' ? $status : null
+        );
+
+        return $this->streamCsvDownload(
+            'admin-transactions-report',
+            [
+                'Kode Invoice',
+                'Tanggal Transaksi',
+                'Status Transaksi',
+                'Nominal (IDR)',
+                'Metode Pembayaran',
+                'Referensi Pembayaran',
+                'Order Code',
+                'Status Order',
+                'Nama Siswa',
+                'Email Siswa',
+                'Bukti Pembayaran',
+                'Dibayar Pada',
+                'Kedaluwarsa Pada',
+            ],
+            $rows
+        );
     }
 
     public function store(StoreTransactionRequest $request)
@@ -82,6 +113,31 @@ class TransactionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Transaction deleted successfully',
+        ]);
+    }
+
+    private function streamCsvDownload(string $filenamePrefix, array $headers, Collection $rows)
+    {
+        $filename = sprintf('%s-%s.csv', $filenamePrefix, now()->format('Ymd-His'));
+
+        return response()->streamDownload(function () use ($headers, $rows) {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $headers);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, array_values($row));
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache',
         ]);
     }
 }
