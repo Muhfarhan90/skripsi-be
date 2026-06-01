@@ -78,6 +78,14 @@ php -l routes/api.php
 - Untuk endpoint baru, wajib tambah request Bruno yang relevan (struktur folder: role -> domain -> request).
 - Perubahan endpoint belum dianggap selesai jika koleksi Bruno belum ikut diperbarui.
 
+## Diagram Export Rules
+
+- Setiap mengerjakan diagram, hasil export wajib disimpan di `skripsi-be/docs/diagram/`.
+- Diagram use case wajib disimpan di `skripsi-be/docs/diagram/use-case/`.
+- Diagram activity wajib disimpan di `skripsi-be/docs/diagram/activity/`.
+- Diagram sequence wajib disimpan di `skripsi-be/docs/diagram/sequence/`.
+- Jangan simpan hasil export diagram di root project atau folder lain jika termasuk kategori di atas.
+
 ## Testing Instructions
 
 - Minimal setelah perubahan:

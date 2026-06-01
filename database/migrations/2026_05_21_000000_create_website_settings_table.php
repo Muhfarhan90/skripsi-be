@@ -22,11 +22,9 @@ return new class extends Migration
 
         Schema::create('website_social_links', function (Blueprint $table) {
             $table->id();
-            $table->string('platform')->default('custom');
             $table->string('label');
             $table->string('url');
             $table->string('icon')->nullable();
-            $table->unsignedInteger('sort_order')->default(1);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
@@ -35,17 +33,14 @@ return new class extends Migration
             $table->id();
             $table->string('slug')->unique();
             $table->string('title');
-            $table->text('excerpt')->nullable();
             $table->longText('content')->nullable();
-            $table->string('status')->default('draft');
-            $table->timestamp('published_at')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
 
         Schema::create('website_sections', function (Blueprint $table) {
             $table->id();
-            $table->string('page_key')->default('home');
-            $table->string('section_key');
+            $table->string('section_key')->unique();
             $table->string('eyebrow')->nullable();
             $table->string('title')->nullable();
             $table->string('subtitle')->nullable();
@@ -55,11 +50,8 @@ return new class extends Migration
             $table->string('cta_url')->nullable();
             $table->string('secondary_cta_label')->nullable();
             $table->string('secondary_cta_url')->nullable();
-            $table->unsignedInteger('sort_order')->default(1);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-
-            $table->unique(['page_key', 'section_key']);
         });
 
         Schema::create('website_section_items', function (Blueprint $table) {
@@ -68,9 +60,6 @@ return new class extends Migration
             $table->string('title')->nullable();
             $table->text('description')->nullable();
             $table->string('icon')->nullable();
-            $table->string('url')->nullable();
-            $table->unsignedInteger('sort_order')->default(1);
-            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
 

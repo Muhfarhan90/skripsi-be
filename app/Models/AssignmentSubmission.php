@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class AssignmentSubmission extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'assignment_id',
         'enrollment_id',

@@ -16,7 +16,7 @@ class WebsitePageController extends Controller
         app(WebsiteSettingService::class)->ensureDefaultContent();
 
         $pages = WebsitePage::query()
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
+            ->when($request->filled('is_active'), fn ($query) => $query->where('is_active', $request->boolean('is_active')))
             ->orderBy('slug')
             ->get();
 
@@ -70,13 +70,7 @@ class WebsitePageController extends Controller
 
     private function normalizePayload(array $payload): array
     {
-        if (($payload['status'] ?? null) === 'published' && empty($payload['published_at'])) {
-            $payload['published_at'] = now();
-        }
-
-        if (($payload['status'] ?? null) === 'draft') {
-            $payload['published_at'] = null;
-        }
+        $payload['is_active'] = $payload['is_active'] ?? true;
 
         return $payload;
     }

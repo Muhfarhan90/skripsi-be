@@ -32,9 +32,7 @@ class WebsiteSettingService
         $settings = $this->getSettings();
         $sections = WebsiteSection::query()
             ->with('items')
-            ->where('page_key', 'home')
             ->when(! $admin, fn ($query) => $query->where('is_active', true))
-            ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
             ->keyBy('section_key');
@@ -45,12 +43,6 @@ class WebsiteSettingService
         $learningPaths = $sections->get('learning_paths');
         $faqSection = $sections->get('faq');
         $cta = $sections->get('cta');
-        $footerLinks = WebsiteSection::query()
-            ->with('items')
-            ->where('page_key', 'global')
-            ->where('section_key', 'footer_links')
-            ->when(! $admin, fn ($query) => $query->where('is_active', true))
-            ->first();
 
         return [
             'id' => $settings->id,
@@ -97,21 +89,18 @@ class WebsiteSettingService
                 ->all(),
             'social_links' => WebsiteSocialLink::query()
                 ->when(! $admin, fn ($query) => $query->where('is_active', true))
-                ->orderBy('sort_order')
                 ->orderBy('id')
-                ->get(['id', 'platform', 'label', 'url', 'icon', 'sort_order', 'is_active'])
+                ->get(['id', 'label', 'url', 'icon', 'is_active'])
                 ->map(fn (WebsiteSocialLink $link) => [
                     'id' => $link->id,
-                    'platform' => $link->platform,
                     'label' => $link->label,
                     'url' => $link->url,
                     'icon' => $link->icon,
-                    'sort_order' => $link->sort_order,
                     'is_active' => $link->is_active,
                 ])
                 ->values()
                 ->all(),
-            'footer_links' => $this->mapFooterLinks($footerLinks?->items),
+            'footer_links' => $this->buildFooterLinks($admin),
             'sections' => $sections->values()->all(),
             'faqs' => $this->mapFaqs($admin),
             'created_at' => $settings->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
@@ -125,9 +114,7 @@ class WebsiteSettingService
 
         return WebsitePage::query()
             ->where('slug', $slug)
-            ->where('status', 'published')
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
+            ->where('is_active', true)
             ->firstOrFail();
     }
 
@@ -135,7 +122,6 @@ class WebsiteSettingService
     {
         $this->getSettings();
         $this->ensureDefaultHomeSections();
-        $this->ensureDefaultFooterLinks();
         $this->ensureDefaultPages();
         $this->ensureDefaultSocialLinks();
         $this->ensureDefaultFaqCategories();
@@ -151,7 +137,6 @@ class WebsiteSettingService
 
             $section = WebsiteSection::query()->firstOrCreate(
                 [
-                    'page_key' => $sectionPayload['page_key'],
                     'section_key' => $sectionPayload['section_key'],
                 ],
                 $sectionPayload
@@ -160,35 +145,6 @@ class WebsiteSettingService
             if ($section->wasRecentlyCreated) {
                 $this->createDefaultSectionItems($section, $items);
             }
-        }
-    }
-
-    private function ensureDefaultFooterLinks(): void
-    {
-        $section = WebsiteSection::query()->firstOrCreate(
-            [
-                'page_key' => 'global',
-                'section_key' => 'footer_links',
-            ],
-            [
-                'page_key' => 'global',
-                'section_key' => 'footer_links',
-                'eyebrow' => 'Navigasi',
-                'title' => 'Informasi',
-                'body' => 'Link cepat untuk informasi utama platform.',
-                'sort_order' => 1,
-                'is_active' => true,
-            ]
-        );
-
-        if ($section->wasRecentlyCreated) {
-            $this->createDefaultSectionItems($section, [
-                ['title' => 'Tentang Kami', 'url' => '/pages/about-us'],
-                ['title' => 'Help Center', 'url' => '/pages/help-center'],
-                ['title' => 'Syarat & Ketentuan', 'url' => '/pages/terms'],
-                ['title' => 'Kebijakan Privasi', 'url' => '/pages/privacy-policy'],
-                ['title' => 'Courses', 'url' => '/courses'],
-            ]);
         }
     }
 
@@ -240,7 +196,6 @@ class WebsiteSettingService
     private function cleanupLegacyDefaultContent(): void
     {
         WebsiteSection::query()
-            ->where('page_key', 'home')
             ->where('section_key', 'gallery')
             ->where(function ($query) {
                 $query
@@ -251,7 +206,6 @@ class WebsiteSettingService
             ->update(['is_active' => false]);
 
         WebsiteSection::query()
-            ->where('page_key', 'home')
             ->where('section_key', 'stats')
             ->update(['is_active' => false]);
 
@@ -264,22 +218,11 @@ class WebsiteSettingService
                         ->orWhere('content', 'like', '%Dummy%');
                 })
                 ->update([
-                    'excerpt' => $page['excerpt'],
                     'content' => $page['content'],
                 ]);
         }
 
-        $footerLinks = WebsiteSection::query()
-            ->where('page_key', 'global')
-            ->where('section_key', 'footer_links')
-            ->first();
-
-        $footerLinks?->items()
-            ->where('title', 'Katalog Course')
-            ->update(['title' => 'Courses']);
-
         WebsiteSection::query()
-            ->where('page_key', 'home')
             ->where('section_key', 'hero')
             ->whereNull('image_url')
             ->update([
@@ -289,12 +232,8 @@ class WebsiteSettingService
 
     private function createDefaultSectionItems(WebsiteSection $section, array $items): void
     {
-        foreach ($items as $index => $item) {
-            $section->items()->create([
-                ...$item,
-                'sort_order' => $item['sort_order'] ?? $index + 1,
-                'is_active' => $item['is_active'] ?? true,
-            ]);
+        foreach ($items as $item) {
+            $section->items()->create($item);
         }
     }
 
@@ -315,7 +254,6 @@ class WebsiteSettingService
     {
         return [
             [
-                'page_key' => 'home',
                 'section_key' => 'hero',
                 'eyebrow' => 'Platform Belajar Pre-University',
                 'title' => 'Belajar lebih cepat,',
@@ -326,27 +264,22 @@ class WebsiteSettingService
                 'cta_url' => '/register',
                 'secondary_cta_label' => 'Lihat Course',
                 'secondary_cta_url' => '/courses',
-                'sort_order' => 1,
                 'is_active' => true,
             ],
             [
-                'page_key' => 'home',
                 'section_key' => 'featured_courses',
                 'eyebrow' => 'Course Pilihan',
                 'title' => 'Mulai dari sini',
                 'body' => 'Jelajahi course terpopuler dan mulai dari materi yang paling relevan untuk targetmu.',
                 'cta_label' => 'Lihat semua',
                 'cta_url' => '/courses',
-                'sort_order' => 2,
                 'is_active' => true,
             ],
             [
-                'page_key' => 'home',
                 'section_key' => 'features',
                 'eyebrow' => 'Kenapa Belajar di Sini?',
                 'title' => 'Semua yang kamu butuhkan, dalam satu platform',
                 'body' => 'Materi, diskusi, kuis, dan sertifikat tersedia dalam alur belajar yang rapi.',
-                'sort_order' => 3,
                 'is_active' => true,
                 'items' => [
                     [
@@ -382,12 +315,10 @@ class WebsiteSettingService
                 ],
             ],
             [
-                'page_key' => 'home',
                 'section_key' => 'learning_paths',
                 'eyebrow' => 'Alur Belajar',
                 'title' => 'Mulai dari jalur yang paling sesuai dengan targetmu',
                 'body' => 'Pilih course, ikuti materi bertahap, diskusikan kendala, lalu pantau progress sampai sertifikat diterbitkan.',
-                'sort_order' => 4,
                 'is_active' => true,
                 'items' => [
                     [
@@ -413,16 +344,13 @@ class WebsiteSettingService
                 ],
             ],
             [
-                'page_key' => 'home',
                 'section_key' => 'faq',
                 'eyebrow' => 'FAQ',
                 'title' => 'Pertanyaan yang sering ditanyakan',
                 'body' => 'Temukan jawaban singkat sebelum mulai belajar atau menghubungi admin.',
-                'sort_order' => 5,
                 'is_active' => true,
             ],
             [
-                'page_key' => 'home',
                 'section_key' => 'cta',
                 'title' => 'Siap mulai perjalanan belajarmu?',
                 'body' => 'Daftar sekarang gratis dan akses ratusan materi belajar berkualitas.',
@@ -430,7 +358,6 @@ class WebsiteSettingService
                 'cta_url' => '/register',
                 'secondary_cta_label' => 'Sudah punya akun? Masuk',
                 'secondary_cta_url' => '/login',
-                'sort_order' => 6,
                 'is_active' => true,
                 'items' => [
                     ['title' => 'Gratis untuk pelajar'],
@@ -447,34 +374,26 @@ class WebsiteSettingService
             [
                 'slug' => 'about-us',
                 'title' => 'Tentang Kami',
-                'excerpt' => 'Platform belajar pre-university yang membantu siswa belajar lebih terstruktur.',
                 'content' => 'SkripsiLMS menyediakan materi, kuis, forum diskusi, dan sertifikat untuk membantu siswa mempersiapkan diri masuk universitas. Halaman ini dapat disesuaikan melalui admin Website CMS agar sesuai dengan profil institusi.',
-                'status' => 'published',
-                'published_at' => now(),
+                'is_active' => true,
             ],
             [
                 'slug' => 'help-center',
                 'title' => 'Help Center',
-                'excerpt' => 'Pusat bantuan untuk akun, course, pembayaran, dan sertifikat.',
                 'content' => 'Jika mengalami kendala, cek FAQ di landing page atau hubungi admin melalui kontak yang tersedia. Tim admin dapat memperbarui panduan akun, course, pembayaran, dan sertifikat dari CMS.',
-                'status' => 'published',
-                'published_at' => now(),
+                'is_active' => true,
             ],
             [
                 'slug' => 'terms',
                 'title' => 'Syarat & Ketentuan',
-                'excerpt' => 'Ketentuan umum penggunaan platform belajar.',
                 'content' => 'Dengan menggunakan platform ini, pengguna menyetujui aturan penggunaan akun, akses course, diskusi, pembayaran, dan penerbitan sertifikat. Ketentuan dapat diperbarui sesuai kebijakan operasional platform.',
-                'status' => 'published',
-                'published_at' => now(),
+                'is_active' => true,
             ],
             [
                 'slug' => 'privacy-policy',
                 'title' => 'Kebijakan Privasi',
-                'excerpt' => 'Informasi pengelolaan data pengguna platform.',
                 'content' => 'Kami menggunakan data pengguna untuk autentikasi, pengelolaan course, transaksi, progress belajar, dan sertifikat. Kebijakan ini dapat disesuaikan dengan kebutuhan legal dan operasional platform.',
-                'status' => 'published',
-                'published_at' => now(),
+                'is_active' => true,
             ],
         ];
     }
@@ -483,27 +402,21 @@ class WebsiteSettingService
     {
         return [
             [
-                'platform' => 'instagram',
                 'label' => 'Instagram',
                 'url' => 'https://instagram.com/skripsilms',
                 'icon' => 'instagram',
-                'sort_order' => 1,
                 'is_active' => true,
             ],
             [
-                'platform' => 'youtube',
                 'label' => 'YouTube',
                 'url' => 'https://youtube.com/@skripsilms',
                 'icon' => 'youtube',
-                'sort_order' => 2,
                 'is_active' => true,
             ],
             [
-                'platform' => 'linkedin',
                 'label' => 'LinkedIn',
                 'url' => 'https://linkedin.com/company/skripsilms',
                 'icon' => 'linkedin',
-                'sort_order' => 3,
                 'is_active' => true,
             ],
         ];
@@ -564,7 +477,6 @@ class WebsiteSettingService
     private function mapSectionItems(?Collection $items, array $fields): Collection
     {
         return ($items ?? collect())
-            ->filter(fn ($item) => $item->is_active)
             ->map(function ($item) use ($fields) {
                 $payload = [];
 
@@ -572,25 +484,38 @@ class WebsiteSettingService
                     $payload[$field] = $item->{$field};
                 }
 
-                if ($item->url) {
-                    $payload['url'] = $item->url;
-                }
-
                 return $payload;
             })
             ->values();
     }
 
-    private function mapFooterLinks(?Collection $items): array
+    private function buildFooterLinks(bool $admin): array
     {
-        return $this->mapSectionItems($items, ['title'])
-            ->map(fn (array $item) => [
-                'label' => $item['title'] ?? '',
-                'url' => $item['url'] ?? '#',
+        $priority = [
+            'about-us' => 1,
+            'help-center' => 2,
+            'terms' => 3,
+            'privacy-policy' => 4,
+        ];
+
+        $pageLinks = WebsitePage::query()
+            ->when(! $admin, fn ($query) => $query->where('is_active', true))
+            ->get(['slug', 'title'])
+            ->sortBy(fn (WebsitePage $page) => $priority[$page->slug] ?? 1000 + $page->id)
+            ->map(fn (WebsitePage $page) => [
+                'label' => $page->title,
+                'url' => "/pages/{$page->slug}",
             ])
-            ->filter(fn (array $item) => $item['label'] !== '' && $item['url'] !== '')
             ->values()
             ->all();
+
+        return [
+            ...$pageLinks,
+            [
+                'label' => 'Courses',
+                'url' => '/courses',
+            ],
+        ];
     }
 
     private function mapFaqs(bool $admin): array

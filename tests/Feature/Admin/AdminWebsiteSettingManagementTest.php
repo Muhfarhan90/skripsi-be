@@ -35,7 +35,7 @@ it('returns composed default website home content for public visitors', function
         ->assertJsonPath('data.footer_links.0.label', 'Tentang Kami')
         ->assertJsonPath('data.faqs.0.question', 'Apakah course bisa diakses lewat HP?')
         ->assertJsonPath('data.faqs.0.category.name', 'General')
-        ->assertJsonPath('data.social_links.0.platform', 'instagram')
+        ->assertJsonPath('data.social_links.0.icon', 'instagram')
         ->assertJsonPath('data.bottom_cta_bullets.0', 'Gratis untuk pelajar');
 
     $this->assertDatabaseHas('faq_categories', [
@@ -44,12 +44,12 @@ it('returns composed default website home content for public visitors', function
 
     $this->assertDatabaseHas('website_pages', [
         'slug' => 'about-us',
-        'status' => 'published',
+        'is_active' => true,
     ]);
 
     $this->assertDatabaseHas('website_pages', [
         'slug' => 'help-center',
-        'status' => 'published',
+        'is_active' => true,
     ]);
 });
 
@@ -112,26 +112,22 @@ it('handles social link CRUD and exposes active links publicly', function () {
     Sanctum::actingAs($admin);
 
     $createResponse = $this->postJson('/api/admin/website-social-links', [
-        'platform' => 'instagram',
         'label' => 'Instagram',
         'url' => 'https://instagram.com/skripsiakademi',
         'icon' => 'instagram',
-        'sort_order' => 2,
         'is_active' => true,
     ]);
 
     $createResponse->assertOk()
-        ->assertJsonPath('data.platform', 'instagram')
+        ->assertJsonPath('data.icon', 'instagram')
         ->assertJsonPath('data.label', 'Instagram');
 
     $linkId = $createResponse->json('data.id');
 
     $this->putJson("/api/admin/website-social-links/{$linkId}", [
-        'platform' => 'youtube',
         'label' => 'YouTube',
         'url' => 'https://youtube.com/@skripsiakademi',
         'icon' => 'youtube',
-        'sort_order' => 1,
         'is_active' => true,
     ])->assertOk()
         ->assertJsonPath('data.label', 'YouTube');
@@ -160,7 +156,7 @@ it('handles FAQ CRUD and hides inactive FAQs from public response', function () 
         'question' => 'Apakah akun bisa diganti emailnya?',
         'answer' => 'Bisa melalui bantuan admin.',
         'faq_category_id' => $category->id,
-        'sort_order' => 1,
+        'sort_order' => 2,
         'is_active' => true,
     ]);
 
@@ -181,10 +177,11 @@ it('handles FAQ CRUD and hides inactive FAQs from public response', function () 
         'question' => 'Apakah akun bisa diganti emailnya?',
         'answer' => 'Bisa, dan prosesnya dibantu admin.',
         'faq_category_id' => $category->id,
-        'sort_order' => 1,
+        'sort_order' => 3,
         'is_active' => false,
     ])->assertOk()
-        ->assertJsonPath('data.is_active', false);
+        ->assertJsonPath('data.is_active', false)
+        ->assertJsonPath('data.sort_order', 3);
 
     $this->getJson('/api/website/faqs')
         ->assertOk()
@@ -193,22 +190,20 @@ it('handles FAQ CRUD and hides inactive FAQs from public response', function () 
     expect(Faq::query()->whereKey($faqId)->exists())->toBeTrue();
 });
 
-it('handles CMS page publish state for about-us style pages', function () {
+it('handles CMS page active state for about-us style pages', function () {
     $admin = createWebsiteAdminUser();
     Sanctum::actingAs($admin);
 
     $createResponse = $this->postJson('/api/admin/website-pages', [
         'slug' => 'about-us',
         'title' => 'About Us',
-        'excerpt' => 'Tentang platform.',
         'content' => 'Konten about us dari CMS.',
-        'status' => 'published',
-        'published_at' => null,
+        'is_active' => true,
     ]);
 
     $createResponse->assertOk()
         ->assertJsonPath('data.slug', 'about-us')
-        ->assertJsonPath('data.status', 'published');
+        ->assertJsonPath('data.is_active', true);
 
     $pageId = $createResponse->json('data.id');
 
@@ -219,12 +214,10 @@ it('handles CMS page publish state for about-us style pages', function () {
     $this->putJson("/api/admin/website-pages/{$pageId}", [
         'slug' => 'about-us',
         'title' => 'About Us',
-        'excerpt' => 'Tentang platform.',
         'content' => 'Konten draft.',
-        'status' => 'draft',
-        'published_at' => null,
+        'is_active' => false,
     ])->assertOk()
-        ->assertJsonPath('data.status', 'draft');
+        ->assertJsonPath('data.is_active', false);
 
     $this->getJson('/api/website/pages/about-us')
         ->assertNotFound();
@@ -241,7 +234,6 @@ it('updates landing sections with modular section items and explicit secondary c
     $section = WebsiteSection::query()->where('section_key', 'cta')->firstOrFail();
 
     $this->putJson("/api/admin/website-sections/{$section->id}", [
-        'page_key' => 'home',
         'section_key' => 'cta',
         'eyebrow' => null,
         'title' => 'Mulai belajar hari ini',
@@ -252,15 +244,12 @@ it('updates landing sections with modular section items and explicit secondary c
         'cta_url' => '/register',
         'secondary_cta_label' => 'Masuk',
         'secondary_cta_url' => '/login',
-        'sort_order' => 6,
         'is_active' => true,
         'items' => [
             [
                 'title' => 'Gratis untuk pelajar',
                 'description' => 'Pendaftaran awal tanpa biaya.',
                 'icon' => 'book-open',
-                'sort_order' => 1,
-                'is_active' => true,
             ],
         ],
     ])->assertOk()

@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'user_id',
         'voucher_id',

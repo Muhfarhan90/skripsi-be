@@ -19,10 +19,8 @@ class UpsertWebsitePageRequest extends FormRequest
         return [
             'slug' => ['required', 'string', 'max:160', 'alpha_dash:ascii', Rule::unique('website_pages', 'slug')->ignore($pageId)],
             'title' => ['required', 'string', 'max:255'],
-            'excerpt' => ['nullable', 'string', 'max:1000'],
             'content' => ['nullable', 'string'],
-            'status' => ['required', Rule::in(['draft', 'published'])],
-            'published_at' => ['nullable', 'date'],
+            'is_active' => ['nullable', 'boolean'],
         ];
     }
 }

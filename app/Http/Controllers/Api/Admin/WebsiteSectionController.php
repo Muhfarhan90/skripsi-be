@@ -18,9 +18,6 @@ class WebsiteSectionController extends Controller
 
         $sections = WebsiteSection::query()
             ->with('items')
-            ->when($request->filled('page_key'), fn ($query) => $query->where('page_key', $request->string('page_key')))
-            ->orderBy('page_key')
-            ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
 
@@ -82,12 +79,8 @@ class WebsiteSectionController extends Controller
         if (is_array($items)) {
             $section->items()->delete();
 
-            foreach ($items as $index => $item) {
-                $section->items()->create([
-                    ...$item,
-                    'sort_order' => $item['sort_order'] ?? $index + 1,
-                    'is_active' => $item['is_active'] ?? true,
-                ]);
+            foreach ($items as $item) {
+                $section->items()->create($item);
             }
         }
 

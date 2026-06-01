@@ -14,7 +14,6 @@ class WebsiteSocialLinkController extends Controller
     {
         $links = WebsiteSocialLink::query()
             ->when($request->filled('is_active'), fn ($query) => $query->where('is_active', $request->boolean('is_active')))
-            ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
 
@@ -68,8 +67,6 @@ class WebsiteSocialLinkController extends Controller
 
     private function normalizePayload(array $payload): array
     {
-        $payload['platform'] = $payload['platform'] ?? 'custom';
-        $payload['sort_order'] = $payload['sort_order'] ?? 1;
         $payload['is_active'] = $payload['is_active'] ?? true;
 
         return $payload;

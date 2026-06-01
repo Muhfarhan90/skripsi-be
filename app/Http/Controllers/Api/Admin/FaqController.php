@@ -32,7 +32,7 @@ class FaqController extends Controller
 
     public function store(UpsertFaqRequest $request)
     {
-        $faq = Faq::query()->create($request->validated());
+        $faq = Faq::query()->create($this->normalizePayload($request->validated()));
 
         return response()->json([
             'success' => true,
@@ -52,7 +52,7 @@ class FaqController extends Controller
 
     public function update(UpsertFaqRequest $request, Faq $faq)
     {
-        $faq->update($request->validated());
+        $faq->update($this->normalizePayload($request->validated()));
 
         return response()->json([
             'success' => true,
@@ -69,5 +69,13 @@ class FaqController extends Controller
             'success' => true,
             'message' => 'FAQ deleted successfully',
         ]);
+    }
+
+    private function normalizePayload(array $payload): array
+    {
+        $payload['sort_order'] = max(1, (int) ($payload['sort_order'] ?? 1));
+        $payload['is_active'] = $payload['is_active'] ?? true;
+
+        return $payload;
     }
 }

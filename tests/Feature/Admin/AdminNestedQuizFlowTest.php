@@ -130,7 +130,9 @@ it('handles scoped question CRUD under quiz route', function () {
         'is_active' => true,
         'is_random' => false,
     ]);
+    $quizResponse->assertOk();
     $quizId = $quizResponse->json('data.id');
+    expect($quizId)->not->toBeNull();
 
     $questionResponse = $this->postJson("/api/admin/quizzes/{$quizId}/questions", [
         'question_text' => '2 + 2 = ?',

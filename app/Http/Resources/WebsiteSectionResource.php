@@ -11,7 +11,6 @@ class WebsiteSectionResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'page_key' => $this->page_key,
             'section_key' => $this->section_key,
             'eyebrow' => $this->eyebrow,
             'title' => $this->title,
@@ -22,7 +21,6 @@ class WebsiteSectionResource extends JsonResource
             'cta_url' => $this->cta_url,
             'secondary_cta_label' => $this->secondary_cta_label,
             'secondary_cta_url' => $this->secondary_cta_url,
-            'sort_order' => $this->sort_order,
             'is_active' => $this->is_active,
             'items' => WebsiteSectionItemResource::collection($this->whenLoaded('items')),
             'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),

@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class Voucher extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'code',
         'discount_type',

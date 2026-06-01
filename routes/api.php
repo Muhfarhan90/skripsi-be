@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\Api\Admin\CategoryController;
 use App\Http\Controllers\Api\Admin\AcademicPeriodController;
+use App\Http\Controllers\Api\Admin\ActivityLogController;
 use App\Http\Controllers\Api\Admin\AssignmentController as AdminAssignmentController;
 use App\Http\Controllers\Api\Admin\CertificateSettingController;
 use App\Http\Controllers\Api\Admin\CourseController;
 use App\Http\Controllers\Api\Admin\CourseOfferingController;
+use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\EnrollmentController as AdminEnrollmentController;
 use App\Http\Controllers\Api\Admin\FaqCategoryController as AdminFaqCategoryController;
 use App\Http\Controllers\Api\Admin\FaqController as AdminFaqController;
@@ -129,7 +131,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'generate']);
 });
 
-Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function () {
+Route::prefix('admin')->middleware(['auth:sanctum', 'activity-log-causer', 'admin'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/activity-logs', [ActivityLogController::class, 'index']);
     Route::get('/courses/{courseId}/curriculum', [CourseController::class, 'curriculum']);
     Route::put('/courses/{courseId}/curriculum', [CourseController::class, 'upsertCurriculum']);
     Route::get('/courses/{courseId}/quizzes', [QuizController::class, 'indexByCourse']);
@@ -197,22 +201,22 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::delete('/courses/{courseId}/reviews/{reviewId}', [AdminReviewController::class, 'destroy']);
 });
 
-Route::apiResource('admin/categories', CategoryController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/skills', SkillController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/courses', CourseController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/sections', SectionController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/lessons', LessonController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/quizzes', QuizController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/questions', QuestionController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/options', OptionController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/vouchers', VoucherController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/transactions', TransactionController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/users', UserController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/academic-periods', AcademicPeriodController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/course-offerings', CourseOfferingController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/website-social-links', WebsiteSocialLinkController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/website-pages', WebsitePageController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/website-sections', WebsiteSectionController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/faq-categories', AdminFaqCategoryController::class)->middleware(['auth:sanctum', 'admin']);
-Route::apiResource('admin/faqs', AdminFaqController::class)->middleware(['auth:sanctum', 'admin']);
+Route::apiResource('admin/categories', CategoryController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/skills', SkillController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/courses', CourseController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/sections', SectionController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/lessons', LessonController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/quizzes', QuizController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/questions', QuestionController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/options', OptionController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/vouchers', VoucherController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/transactions', TransactionController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/users', UserController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/roles', RoleController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/academic-periods', AcademicPeriodController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/course-offerings', CourseOfferingController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/website-social-links', WebsiteSocialLinkController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/website-pages', WebsitePageController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/website-sections', WebsiteSectionController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/faq-categories', AdminFaqCategoryController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);
+Route::apiResource('admin/faqs', AdminFaqController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);

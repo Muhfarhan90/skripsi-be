@@ -2,20 +2,21 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class WebsitePage extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'slug',
         'title',
-        'excerpt',
         'content',
-        'status',
-        'published_at',
+        'is_active',
     ];
 
     protected $casts = [
-        'published_at' => 'datetime',
+        'is_active' => 'boolean',
     ];
 }

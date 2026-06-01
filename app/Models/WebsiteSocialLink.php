@@ -2,21 +2,21 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class WebsiteSocialLink extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
-        'platform',
         'label',
         'url',
         'icon',
-        'sort_order',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'sort_order' => 'integer',
     ];
 }

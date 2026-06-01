@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Faq extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'question',
         'answer',
@@ -16,8 +19,8 @@ class Faq extends Model
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'is_active' => 'boolean',
     ];
 
     public function category(): BelongsTo

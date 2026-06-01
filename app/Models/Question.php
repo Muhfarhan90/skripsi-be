@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Question extends Model
 {       
-    use SoftDeletes;
+    use LogsAdminActivity, SoftDeletes;
 
     protected $fillable = [
         'quiz_id',

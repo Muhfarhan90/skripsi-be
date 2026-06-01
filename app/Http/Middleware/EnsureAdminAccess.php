@@ -11,8 +11,9 @@ class EnsureAdminAccess
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        $roleName = strtolower((string) $user?->role?->name);
 
-        if (! $user || (int) $user->role_id === 3) {
+        if (! $user || ! in_array($roleName, ['admin', 'instructor'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Forbidden',

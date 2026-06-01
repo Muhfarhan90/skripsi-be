@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WebsiteSection extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
-        'page_key',
         'section_key',
         'eyebrow',
         'title',
@@ -19,17 +21,15 @@ class WebsiteSection extends Model
         'cta_url',
         'secondary_cta_label',
         'secondary_cta_url',
-        'sort_order',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'sort_order' => 'integer',
     ];
 
     public function items(): HasMany
     {
-        return $this->hasMany(WebsiteSectionItem::class, 'section_id')->orderBy('sort_order')->orderBy('id');
+        return $this->hasMany(WebsiteSectionItem::class, 'section_id')->orderBy('id');
     }
 }

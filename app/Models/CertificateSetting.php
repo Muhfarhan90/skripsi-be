@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 
 class CertificateSetting extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'organization_name',
         'certificate_title',

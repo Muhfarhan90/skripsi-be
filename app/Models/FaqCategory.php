@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FaqCategory extends Model
 {
+    use LogsAdminActivity;
+
     protected $fillable = [
         'name',
         'is_active',
