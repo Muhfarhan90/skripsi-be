@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\Admin\QuizAttemptController as AdminQuizAttemptCont
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\QuestionController;
 use App\Http\Controllers\Api\Admin\QuizController;
+use App\Http\Controllers\Api\Admin\ReportController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\SectionController;
 use App\Http\Controllers\Api\Admin\SkillController;
@@ -38,16 +39,24 @@ use App\Http\Controllers\Api\ForumController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\CertificateController;
+use App\Http\Controllers\Api\MidtransWebhookController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\LessonProgressController;
 use App\Http\Controllers\Api\QuizAttemptController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserDeviceController;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    $user = $request->user();
+
+    return response()->json([
+        'success' => (bool) $user,
+        'message' => $user ? 'Current user retrieved successfully' : 'Unauthenticated',
+        'data' => $user ? new UserResource($user->loadMissing('role')) : null,
+    ], $user ? 200 : 401);
 })->middleware('auth:sanctum');
 
 Route::prefix('auth')->group(function () {
@@ -73,6 +82,7 @@ Route::get('/website/home', [WebsiteSettingController::class, 'home']);
 Route::get('/website/pages/{slug}', [WebsiteSettingController::class, 'page']);
 Route::get('/website/faqs', [WebsiteSettingController::class, 'faqs']);
 Route::get('/website/faq-categories', [WebsiteSettingController::class, 'faqCategories']);
+Route::post('/payments/midtrans/notification', MidtransWebhookController::class);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/enrollments', [EnrollmentController::class, 'index']);
@@ -100,6 +110,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
+    Route::post('/orders/payment-proof-upload', [OrderController::class, 'uploadPaymentProof']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::patch('/orders/{id}/payment-submission', [OrderController::class, 'submitPayment']);
 
@@ -129,6 +140,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/certificates/{certificateId}/download', [CertificateController::class, 'download']);
     Route::get('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'show']);
     Route::post('/enrollments/{enrollmentId}/certificate', [CertificateController::class, 'generate']);
+});
+
+Route::prefix('admin')->middleware(['auth:sanctum', 'activity-log-causer', 'platform-admin'])->group(function () {
+    Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary']);
+    Route::get('/reports/sales/export', [ReportController::class, 'exportSales']);
+    Route::get('/courses/{courseId}/reviews', [AdminReviewController::class, 'index']);
+    Route::delete('/courses/{courseId}/reviews/{reviewId}', [AdminReviewController::class, 'destroy']);
 });
 
 Route::prefix('admin')->middleware(['auth:sanctum', 'activity-log-causer', 'admin'])->group(function () {
@@ -197,8 +215,6 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'activity-log-causer', 'admi
     Route::put('/forum-replies/{replyId}', [AdminForumController::class, 'updateReply']);
     Route::delete('/forum-replies/{replyId}', [AdminForumController::class, 'destroyReply']);
 
-    // Reviews (Admin & Instructor) - Moderasi menghapus review
-    Route::delete('/courses/{courseId}/reviews/{reviewId}', [AdminReviewController::class, 'destroy']);
 });
 
 Route::apiResource('admin/categories', CategoryController::class)->middleware(['auth:sanctum', 'activity-log-causer', 'admin']);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAdminAccess;
+use App\Http\Middleware\EnsurePlatformAdminAccess;
 use App\Http\Middleware\SetActivityLogCauser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => EnsureAdminAccess::class,
+            'platform-admin' => EnsurePlatformAdminAccess::class,
             'activity-log-causer' => SetActivityLogCauser::class,
         ]);
     })
