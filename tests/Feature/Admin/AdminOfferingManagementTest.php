@@ -119,6 +119,87 @@ it('handles academic period CRUD and prevents deleting periods with offerings', 
     ]);
 });
 
+it('prevents activating a second academic period while another one is active', function () {
+    $admin = createAdminOfferingManager();
+    Sanctum::actingAs($admin);
+
+    createManagedPeriod('PRE-U-2026-A', [
+        'name' => 'Pre-University Period A 2026',
+        'start_at' => '2026-01-10 08:00:00',
+        'end_at' => '2026-04-10 17:00:00',
+        'enrollment_open_at' => '2025-12-15 08:00:00',
+        'enrollment_close_at' => '2026-01-15 17:00:00',
+        'is_active' => true,
+    ]);
+
+    $this->postJson('/api/admin/academic-periods', [
+        'code' => 'PRE-U-2026-B',
+        'name' => 'Pre-University Period B 2026',
+        'start_at' => '2026-03-01 08:00:00',
+        'end_at' => '2026-06-01 17:00:00',
+        'enrollment_open_at' => '2026-02-01 08:00:00',
+        'enrollment_close_at' => '2026-03-05 17:00:00',
+        'is_active' => true,
+    ])->assertStatus(422)
+      ->assertJsonPath('success', false)
+      ->assertJsonPath(
+          'errors.is_active.0',
+          'Hanya satu academic period yang boleh aktif. Period Pre-University Period A 2026 masih aktif, nonaktifkan terlebih dahulu.',
+      );
+
+    $inactivePeriod = createManagedPeriod('PRE-U-2026-C', [
+        'name' => 'Pre-University Period C 2026',
+        'start_at' => '2026-03-15 08:00:00',
+        'end_at' => '2026-05-20 17:00:00',
+        'enrollment_open_at' => '2026-02-20 08:00:00',
+        'enrollment_close_at' => '2026-03-20 17:00:00',
+        'is_active' => false,
+    ]);
+
+    $this->putJson("/api/admin/academic-periods/{$inactivePeriod->id}", [
+        'code' => 'PRE-U-2026-C',
+        'name' => 'Pre-University Period C 2026',
+        'start_at' => '2026-03-15 08:00:00',
+        'end_at' => '2026-05-20 17:00:00',
+        'enrollment_open_at' => '2026-02-20 08:00:00',
+        'enrollment_close_at' => '2026-03-20 17:00:00',
+        'is_active' => true,
+    ])->assertStatus(422)
+      ->assertJsonPath('success', false)
+      ->assertJsonPath(
+          'errors.is_active.0',
+          'Hanya satu academic period yang boleh aktif. Period Pre-University Period A 2026 masih aktif, nonaktifkan terlebih dahulu.',
+      );
+
+    $this->postJson('/api/admin/academic-periods', [
+        'code' => 'PRE-U-2026-D',
+        'name' => 'Pre-University Period D 2026',
+        'start_at' => '2026-04-10 17:00:00',
+        'end_at' => '2026-07-10 17:00:00',
+        'enrollment_open_at' => '2026-03-10 08:00:00',
+        'enrollment_close_at' => '2026-04-15 17:00:00',
+        'is_active' => true,
+    ])->assertStatus(422)
+      ->assertJsonPath('success', false)
+      ->assertJsonPath(
+          'errors.is_active.0',
+          'Hanya satu academic period yang boleh aktif. Period Pre-University Period A 2026 masih aktif, nonaktifkan terlebih dahulu.',
+      );
+
+    $this->postJson('/api/admin/academic-periods', [
+        'code' => 'PRE-U-2026-E',
+        'name' => 'Pre-University Period E 2026',
+        'start_at' => '2026-04-10 17:00:00',
+        'end_at' => '2026-07-10 17:00:00',
+        'enrollment_open_at' => '2026-03-10 08:00:00',
+        'enrollment_close_at' => '2026-04-15 17:00:00',
+        'is_active' => false,
+    ])->assertOk()
+      ->assertJsonPath('success', true)
+      ->assertJsonPath('data.code', 'PRE-U-2026-E')
+      ->assertJsonPath('data.is_active', false);
+});
+
 it('handles course offering CRUD, enforces unique course-period offerings, and blocks delete when enrolled', function () {
     $admin = createAdminOfferingManager();
     Sanctum::actingAs($admin);

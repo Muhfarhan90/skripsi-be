@@ -7,15 +7,18 @@ use App\Models\ForumPost;
 use App\Models\ForumReply;
 use App\Models\Enrollment;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 
 class ForumService
 {
     protected EnrollmentService $enrollmentService;
+    protected NotificationService $notificationService;
 
-    public function __construct(EnrollmentService $enrollmentService)
+    public function __construct(EnrollmentService $enrollmentService, NotificationService $notificationService)
     {
         $this->enrollmentService = $enrollmentService;
+        $this->notificationService = $notificationService;
     }
 
     /*
@@ -27,13 +30,16 @@ class ForumService
     /**
      * Student: Mendapatkan semua post berdasarkan course_id.
      */
-    public function getPostsByCourse(int $courseId, int $userId)
+    public function getPostsByCourse(int $courseId, int $userId, ?string $search = null)
     {
         $this->ensureEnrolled($courseId, $userId);
 
-        return ForumPost::where('course_id', $courseId)
+        return $this->applyPostSearch(
+            ForumPost::where('course_id', $courseId)
             ->with(['user', 'replies'])
-            ->withCount('replies')
+            ->withCount('replies'),
+            $search
+        )
             ->orderByDesc('is_pinned')
             ->latest()
             ->paginate(15);
@@ -68,7 +74,10 @@ class ForumService
             'content' => $data['content'],
         ]);
 
-        return $post->load('user');
+        $post->load('user');
+        $this->notificationService->publishForumPostCreated($post);
+
+        return $post;
     }
 
     /**
@@ -112,7 +121,11 @@ class ForumService
             'content' => $data['content'],
         ]);
 
-        return $reply->load('user');
+        $reply->load('user');
+        $this->notificationService->publishForumReplyCreated($reply);
+        $this->notificationService->publishForumReplyReceived($reply, true);
+
+        return $reply;
     }
 
     /**
@@ -146,13 +159,16 @@ class ForumService
      * - Admin: bisa akses semua course.
      * - Instructor: hanya course yang dia ajar.
      */
-    public function getPostsByCourseForAdmin(int $courseId, User $user)
+    public function getPostsByCourseForAdmin(int $courseId, User $user, ?string $search = null)
     {
         $this->ensureAdminAccess($courseId, $user);
 
-        return ForumPost::where('course_id', $courseId)
+        return $this->applyPostSearch(
+            ForumPost::where('course_id', $courseId)
             ->with(['user', 'replies'])
-            ->withCount('replies')
+            ->withCount('replies'),
+            $search
+        )
             ->orderByDesc('is_pinned')
             ->latest()
             ->paginate(15);
@@ -221,7 +237,10 @@ class ForumService
             'content' => $data['content'],
         ]);
 
-        return $reply->load('user');
+        $reply->load('user');
+        $this->notificationService->publishForumReplyReceived($reply);
+
+        return $reply;
     }
 
     /**
@@ -334,6 +353,20 @@ class ForumService
         throw ValidationException::withMessages([
             'role' => ['You do not have permission to access this resource.'],
         ]);
+    }
+
+    private function applyPostSearch(Builder $query, ?string $search): Builder
+    {
+        $keyword = trim((string) $search);
+
+        if ($keyword === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $builder) use ($keyword) {
+            $builder->where('title', 'like', "%{$keyword}%")
+                ->orWhere('content', 'like', "%{$keyword}%");
+        });
     }
 
     private function isAdmin(User $user): bool

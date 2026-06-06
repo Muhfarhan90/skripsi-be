@@ -10,6 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class ReviewService
 {
+    public function __construct(
+        private readonly NotificationService $notificationService
+    ) {}
+
     /**
      * Mendapatkan semua review untuk sebuah course (Public).
      */
@@ -48,7 +52,20 @@ class ReviewService
             'review' => $data['review'] ?? null,
         ]);
 
-        return $review->load('user:id,fullname,avatar');
+        $review->load('user:id,fullname,avatar');
+        $this->notificationService->publishCourseReviewCreated($review);
+
+        return $review;
+    }
+
+    public function getCourseReviewsForAdmin(int $courseId, User $user)
+    {
+        $this->ensureAdminAccess($courseId, $user);
+
+        return Review::where('course_id', $courseId)
+            ->with('user:id,fullname,avatar,email')
+            ->latest()
+            ->paginate(15);
     }
 
     /**
@@ -78,7 +95,7 @@ class ReviewService
     }
 
     /**
-     * Admin/Instructor: Menghapus ulasan siapapun.
+     * Admin: Menghapus ulasan siapapun.
      */
     public function deleteReviewForAdmin(int $courseId, int $reviewId, User $user): void
     {
@@ -121,21 +138,8 @@ class ReviewService
             return;
         }
 
-        if ($user->role && $user->role->name === 'instructor') {
-            $isTeaching = Course::where('id', $courseId)
-                ->where('instructor_id', $user->id)
-                ->exists();
-
-            if (!$isTeaching) {
-                throw ValidationException::withMessages([
-                    'course_id' => ['You can only access reviews in courses you teach.'],
-                ]);
-            }
-            return;
-        }
-
         throw ValidationException::withMessages([
-            'role' => ['You do not have permission to moderate this resource.'],
+            'role' => ['You do not have permission to access course reviews.'],
         ]);
     }
 }

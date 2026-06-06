@@ -2,9 +2,14 @@
 
 namespace App\Http\Requests\Admin\AcademicPeriod;
 
+use App\Http\Requests\Admin\AcademicPeriod\Concerns\ValidatesSingleActivePeriod;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
+
 class StoreAcademicPeriodRequest extends FormRequest
 {
+    use ValidatesSingleActivePeriod;
+
     public function authorize(): bool
     {
         return true;
@@ -20,6 +25,15 @@ class StoreAcademicPeriodRequest extends FormRequest
             'enrollment_open_at' => ['required', 'date'],
             'enrollment_close_at' => ['required', 'date', 'after:enrollment_open_at'],
             'is_active' => ['required', 'boolean'],
+        ];
+    }
+
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                $this->validateSingleActivePeriod($validator);
+            },
         ];
     }
 }

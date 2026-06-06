@@ -22,7 +22,11 @@ class ForumController extends Controller
 
     public function index(Request $request, string $courseId)
     {
-        $posts = $this->service->getPostsByCourse((int) $courseId, (int) $request->user()->id);
+        $posts = $this->service->getPostsByCourse(
+            (int) $courseId,
+            (int) $request->user()->id,
+            $request->query('search')
+        );
 
         return response()->json([
             'success' => true,

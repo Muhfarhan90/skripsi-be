@@ -14,6 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class AssignmentService
 {
+    public function __construct(
+        private readonly NotificationService $notificationService
+    ) {}
+
     public function getAssignmentsForEnrollment(int $userId, int $enrollmentId): array
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
@@ -126,7 +130,7 @@ class AssignmentService
 
         $attemptNo = ($latest?->attempt_no ?? 0) + 1;
 
-        return AssignmentSubmission::create([
+        $submission = AssignmentSubmission::create([
             'assignment_id' => $assignment->id,
             'enrollment_id' => $enrollment->id,
             'user_id' => $enrollment->user_id,
@@ -139,6 +143,10 @@ class AssignmentService
             'submitted_at' => now(),
             'reviewed_at' => null,
         ])->load('reviewer:id,fullname');
+
+        $this->notificationService->publishAssignmentSubmitted($submission);
+
+        return $submission;
     }
 
     public function getAssignmentsByCourseForAdmin(int $courseId, User $actor)

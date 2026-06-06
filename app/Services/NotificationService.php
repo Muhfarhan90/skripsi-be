@@ -3,9 +3,14 @@
 namespace App\Services;
 
 use App\Jobs\SendPushNotificationJob;
+use App\Models\AssignmentSubmission;
+use App\Models\Course;
 use App\Models\Enrollment;
+use App\Models\ForumPost;
+use App\Models\ForumReply;
 use App\Models\Notification;
 use App\Models\Order;
+use App\Models\Review;
 use App\Models\Transaction;
 use App\Models\User;
 
@@ -153,11 +158,8 @@ class NotificationService
         }
 
         $student = $order->user;
-        $adminRecipients = User::query()
-            ->whereHas('role', function ($query) {
-                $query->where('name', 'admin');
-            })
-            ->get(['id']);
+        $adminRecipients = $this->getAdminRecipients();
+        $body = $student->fullname . ' membuat order ' . $order->order_code . '.';
 
         foreach ($adminRecipients as $adminRecipient) {
             $this->saveUniqueNotification([
@@ -167,14 +169,14 @@ class NotificationService
                 'reference_id' => $order->id,
             ], [
                 'title' => 'Order baru dari student',
-                'body' => $student->fullname . ' membuat order ' . $order->order_code . ' dan menunggu tindak lanjut admin.',
+                'body' => $body,
                 'data' => [
                     'order_id' => $order->id,
                     'order_code' => $order->order_code,
                     'transaction_id' => $transaction?->id,
                     'student_id' => $student->id,
                     'student_name' => $student->fullname,
-                    'route' => '/admin/orders',
+                    'route' => '/admin/orders/' . $order->id,
                 ],
                 'actor_id' => $student->id,
                 'read_at' => null,
@@ -193,11 +195,7 @@ class NotificationService
         }
 
         $student = $order->user;
-        $adminRecipients = User::query()
-            ->whereHas('role', function ($query) {
-                $query->where('name', 'admin');
-            })
-            ->get(['id']);
+        $adminRecipients = $this->getAdminRecipients();
 
         foreach ($adminRecipients as $adminRecipient) {
             $this->saveUniqueNotification([
@@ -221,6 +219,279 @@ class NotificationService
                 'sent_at' => now(),
             ]);
         }
+    }
+
+    public function publishAssignmentSubmitted(AssignmentSubmission $submission): void
+    {
+        $submission->loadMissing([
+            'assignment.course:id,title,instructor_id',
+            'enrollment.courseOffering:id,course_id,academic_period_id',
+            'user:id,fullname',
+        ]);
+
+        $assignment = $submission->assignment;
+        $course = $assignment?->course;
+        $offering = $submission->enrollment?->courseOffering;
+
+        if (! $assignment || ! $course || ! $offering) {
+            return;
+        }
+
+        $studentName = $submission->user?->fullname ?: 'Student';
+        $route = sprintf(
+            '/admin/course-activity/assignment-reviews?offeringId=%s&submissionId=%s',
+            $offering->id,
+            $submission->id
+        );
+
+        foreach ($this->getCourseStakeholderRecipients($course, (int) $submission->user_id) as $recipient) {
+            $this->saveUniqueNotification([
+                'user_id' => $recipient->id,
+                'type' => 'assignment.submitted',
+                'reference_type' => 'assignment_submission',
+                'reference_id' => $submission->id,
+            ], [
+                'title' => 'Submission assignment baru',
+                'body' => $studentName . ' mengirim assignment "' . $assignment->title . '" pada course "' . $course->title . '".',
+                'data' => [
+                    'course_id' => $course->id,
+                    'course_offering_id' => $offering->id,
+                    'academic_period_id' => $offering->academic_period_id,
+                    'assignment_id' => $assignment->id,
+                    'submission_id' => $submission->id,
+                    'enrollment_id' => $submission->enrollment_id,
+                    'student_id' => $submission->user_id,
+                    'route' => $route,
+                ],
+                'actor_id' => $submission->user_id,
+                'read_at' => null,
+                'sent_at' => now(),
+            ]);
+        }
+    }
+
+    public function publishForumPostCreated(ForumPost $post): void
+    {
+        $post->loadMissing(['course:id,title,instructor_id', 'user:id,fullname']);
+
+        $course = $post->course;
+        if (! $course) {
+            return;
+        }
+
+        $studentName = $post->user?->fullname ?: 'Student';
+
+        foreach ($this->getCourseStakeholderRecipients($course, (int) $post->user_id) as $recipient) {
+            $this->saveUniqueNotification([
+                'user_id' => $recipient->id,
+                'type' => 'forum.posted',
+                'reference_type' => 'forum_post',
+                'reference_id' => $post->id,
+            ], [
+                'title' => 'Topik forum baru',
+                'body' => $studentName . ' membuat topik forum "' . $post->title . '" pada course "' . $course->title . '".',
+                'data' => [
+                    'course_id' => $course->id,
+                    'post_id' => $post->id,
+                    'student_id' => $post->user_id,
+                    'route' => '/admin/course-activity/forum?courseId=' . $course->id . '&forumPostId=' . $post->id,
+                ],
+                'actor_id' => $post->user_id,
+                'read_at' => null,
+                'sent_at' => now(),
+            ]);
+        }
+    }
+
+    public function publishForumReplyCreated(ForumReply $reply): void
+    {
+        $reply->loadMissing(['post.course:id,title,instructor_id', 'user:id,fullname']);
+
+        $post = $reply->post;
+        $course = $post?->course;
+
+        if (! $post || ! $course) {
+            return;
+        }
+
+        $studentName = $reply->user?->fullname ?: 'Student';
+
+        foreach ($this->getCourseStakeholderRecipients($course, (int) $reply->user_id) as $recipient) {
+            $this->saveUniqueNotification([
+                'user_id' => $recipient->id,
+                'type' => 'forum.replied',
+                'reference_type' => 'forum_reply',
+                'reference_id' => $reply->id,
+            ], [
+                'title' => 'Balasan forum baru',
+                'body' => $studentName . ' membalas topik "' . $post->title . '" pada course "' . $course->title . '".',
+                'data' => [
+                    'course_id' => $course->id,
+                    'post_id' => $post->id,
+                    'reply_id' => $reply->id,
+                    'student_id' => $reply->user_id,
+                    'route' => '/admin/course-activity/forum?courseId=' . $course->id . '&forumPostId=' . $post->id,
+                ],
+                'actor_id' => $reply->user_id,
+                'read_at' => null,
+                'sent_at' => now(),
+            ]);
+        }
+    }
+
+    public function publishForumReplyReceived(ForumReply $reply, bool $skipIfCourseStakeholder = false): void
+    {
+        $reply->loadMissing([
+            'post.course:id,title,instructor_id',
+            'post.user:id,fullname,role_id',
+            'post.user.role:id,name',
+            'user:id,fullname',
+        ]);
+
+        $post = $reply->post;
+        $course = $post?->course;
+        $postOwner = $post?->user;
+
+        if (! $post || ! $course || ! $postOwner || (int) $postOwner->id === (int) $reply->user_id) {
+            return;
+        }
+
+        if ($skipIfCourseStakeholder && $this->isCourseStakeholderRecipient($postOwner, $course)) {
+            return;
+        }
+
+        $replierName = $reply->user?->fullname ?: 'Pengguna';
+        $route = $this->resolveForumPostOwnerRoute($post, $postOwner);
+        $data = [
+            'course_id' => $course->id,
+            'post_id' => $post->id,
+            'reply_id' => $reply->id,
+            'post_owner_id' => $postOwner->id,
+            'replier_id' => $reply->user_id,
+        ];
+
+        if ($route) {
+            $data['route'] = $route;
+        }
+
+        $this->saveUniqueNotification([
+            'user_id' => $postOwner->id,
+            'type' => 'forum.reply.received',
+            'reference_type' => 'forum_reply',
+            'reference_id' => $reply->id,
+        ], [
+            'title' => 'Topik forum Anda mendapat balasan',
+            'body' => $replierName . ' membalas topik "' . $post->title . '" pada course "' . $course->title . '".',
+            'data' => $data,
+            'actor_id' => $reply->user_id,
+            'read_at' => null,
+            'sent_at' => now(),
+        ]);
+    }
+
+    public function publishCourseReviewCreated(Review $review): void
+    {
+        $review->loadMissing(['course:id,title,instructor_id', 'user:id,fullname']);
+
+        $course = $review->course;
+        if (! $course) {
+            return;
+        }
+
+        $studentName = $review->user?->fullname ?: 'Student';
+
+        foreach ($this->getAdminRecipients((int) $review->user_id) as $recipient) {
+            $this->saveUniqueNotification([
+                'user_id' => $recipient->id,
+                'type' => 'course.review.created',
+                'reference_type' => 'review',
+                'reference_id' => $review->id,
+            ], [
+                'title' => 'Review course baru',
+                'body' => $studentName . ' memberi rating ' . $review->rating . ' untuk course "' . $course->title . '".',
+                'data' => [
+                    'course_id' => $course->id,
+                    'review_id' => $review->id,
+                    'student_id' => $review->user_id,
+                    'route' => '/admin/course-reviews?courseId=' . $course->id . '&reviewId=' . $review->id,
+                ],
+                'actor_id' => $review->user_id,
+                'read_at' => null,
+                'sent_at' => now(),
+            ]);
+        }
+    }
+
+    private function getAdminRecipients(?int $excludeUserId = null)
+    {
+        return User::query()
+            ->whereHas('role', function ($query) {
+                $query->where('name', 'admin');
+            })
+            ->when($excludeUserId !== null, function ($query) use ($excludeUserId) {
+                $query->where('id', '!=', $excludeUserId);
+            })
+            ->get(['id']);
+    }
+
+    private function getCourseStakeholderRecipients(Course $course, ?int $excludeUserId = null)
+    {
+        return User::query()
+            ->where(function ($query) use ($course) {
+                $query->whereHas('role', function ($roleQuery) {
+                    $roleQuery->where('name', 'admin');
+                });
+
+                if ($course->instructor_id) {
+                    $query->orWhere('id', $course->instructor_id);
+                }
+            })
+            ->when($excludeUserId !== null, function ($query) use ($excludeUserId) {
+                $query->where('id', '!=', $excludeUserId);
+            })
+            ->get(['id'])
+            ->unique('id')
+            ->values();
+    }
+
+    private function isCourseStakeholderRecipient(User $user, Course $course): bool
+    {
+        $user->loadMissing('role');
+
+        if ($user->role?->name === 'admin') {
+            return true;
+        }
+
+        return $user->role?->name === 'instructor' && (int) $course->instructor_id === (int) $user->id;
+    }
+
+    private function resolveForumPostOwnerRoute(ForumPost $post, User $postOwner): ?string
+    {
+        $postOwner->loadMissing('role');
+
+        if (in_array($postOwner->role?->name, ['admin', 'instructor'], true)) {
+            return sprintf('/admin/course-activity/forum/%s/%s', $post->course_id, $post->id);
+        }
+
+        $enrollmentId = $this->findForumEnrollmentId((int) $post->course_id, (int) $postOwner->id);
+
+        if ($enrollmentId !== null) {
+            return sprintf('/student/enrollments/%s/forum/%s', $enrollmentId, $post->id);
+        }
+
+        return '/student/notifications';
+    }
+
+    private function findForumEnrollmentId(int $courseId, int $userId): ?int
+    {
+        return Enrollment::query()
+            ->where('user_id', $userId)
+            ->whereHas('courseOffering', function ($query) use ($courseId) {
+                $query->where('course_id', $courseId);
+            })
+            ->whereIn('status', ['active', 'completed'])
+            ->latest('id')
+            ->value('id');
     }
 
     private function saveUniqueNotification(array $identity, array $payload): Notification
