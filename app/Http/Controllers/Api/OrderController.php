@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Order\SubmitPaymentRequest;
 use App\Http\Requests\Order\StoreOrderRequest;
+use App\Http\Requests\Order\UploadPaymentProofRequest;
 use App\Http\Resources\OrderResource;
 use App\Services\OrderService;
 use Illuminate\Http\Request;
@@ -60,6 +61,19 @@ class OrderController extends Controller
                 'message' => $e->getMessage(),
             ], 422);
         }
+    }
+
+    public function uploadPaymentProof(UploadPaymentProofRequest $request)
+    {
+        $path = $this->service->uploadPaymentProof($request->file('file'));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment proof uploaded successfully',
+            'data' => [
+                'path' => $path,
+            ],
+        ]);
     }
 
     public function show(Request $request, string $id)

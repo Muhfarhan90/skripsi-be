@@ -1,0 +1,46 @@
+meta {
+  name: POST payments midtrans notification
+  type: http
+  seq: 163
+}
+
+post {
+  url: {{baseUrl}}/payments/midtrans/notification
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "transaction_time": "2026-06-05 14:30:00",
+    "transaction_status": "settlement",
+    "transaction_id": "sample-midtrans-transaction-id",
+    "status_message": "midtrans payment notification",
+    "status_code": "200",
+    "signature_key": "replace-with-sha512(invoice_code + status_code + gross_amount + server_key)",
+    "settlement_time": "2026-06-05 14:31:00",
+    "payment_type": "bank_transfer",
+    "order_id": "INV-20260605-SAMPLE1",
+    "merchant_id": "G000000000",
+    "gross_amount": "150000.00",
+    "fraud_status": "accept",
+    "currency": "IDR",
+    "va_numbers": [
+      {
+        "bank": "bni",
+        "va_number": "9888888888888888"
+      }
+    ]
+  }
+}
+
+docs {
+  URI: api/payments/midtrans/notification
+  Action: App\Http\Controllers\Api\MidtransWebhookController
+  Middleware: api
+}

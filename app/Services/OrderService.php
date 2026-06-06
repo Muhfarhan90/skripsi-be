@@ -10,18 +10,25 @@ use App\Models\Voucher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class OrderService
 {
     protected TransactionService $transactionService;
     protected NotificationService $notificationService;
+    protected MidtransPaymentService $midtransPaymentService;
 
-    public function __construct(TransactionService $transactionService, NotificationService $notificationService)
-    {
+    public function __construct(
+        TransactionService $transactionService,
+        NotificationService $notificationService,
+        MidtransPaymentService $midtransPaymentService
+    ) {
         $this->transactionService = $transactionService;
         $this->notificationService = $notificationService;
+        $this->midtransPaymentService = $midtransPaymentService;
     }
 
     /*
@@ -135,6 +142,21 @@ class OrderService
             ->where('user_id', $userId)
             ->where('status', '!=', 'cart')
             ->findOrFail($id);
+    }
+
+    public function uploadPaymentProof(UploadedFile $file): string
+    {
+        $directory = 'payment-proofs';
+        $filename = 'payment-proof-' . now()->format('YmdHis') . '-' . Str::random(8) . '.' . $file->extension();
+        $path = $file->storeAs($directory, $filename, 'public');
+
+        if (! $path) {
+            throw ValidationException::withMessages([
+                'file' => ['Payment proof upload failed.'],
+            ]);
+        }
+
+        return $path;
     }
 
     public function submitPaymentByStudent(int $userId, int $orderId, array $data): Order
@@ -251,6 +273,18 @@ class OrderService
                 'payment_proof' => $data['payment_proof'] ?? null,
                 'paid_at' => $status === 'completed' ? now() : null,
             ]);
+
+            if ($status === 'pending' && $paymentMethod === 'gateway' && $transaction) {
+                $snapTransaction = $this->midtransPaymentService->createSnapTransaction($order->fresh(['user', 'items.courseOffering.course']), $transaction);
+
+                $transaction->update([
+                    'payment_method' => 'midtrans',
+                    'payment_channel' => collect(config('services.midtrans.enabled_payments', []))->first(),
+                    'payment_url' => $snapTransaction['redirect_url'],
+                    'payment_reference' => $snapTransaction['token'] ?? $transaction->payment_reference,
+                    'expired_at' => now()->addHours(max(1, (int) config('services.midtrans.expiry_duration_hours', 24))),
+                ]);
+            }
 
             if ($status === 'pending' && $transaction) {
                 $this->notificationService->publishOrderPlaced($order->fresh('user'), $transaction->fresh());

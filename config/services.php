@@ -36,4 +36,23 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS', env('GOOGLE_APPLICATION_CREDENTIALS')),
     ],
 
+    'midtrans' => [
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'is_production' => (bool) env('MIDTRANS_IS_PRODUCTION', false),
+        'snap_base_url' => env(
+            'MIDTRANS_SNAP_BASE_URL',
+            (bool) env('MIDTRANS_IS_PRODUCTION', false)
+                ? 'https://app.midtrans.com/snap/v1'
+                : 'https://app.sandbox.midtrans.com/snap/v1'
+        ),
+        'notification_url' => env('MIDTRANS_NOTIFICATION_URL'),
+        'enabled_payments' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', env('MIDTRANS_ENABLED_PAYMENTS', 'bni_va'))
+        ))),
+        'expiry_duration_hours' => (int) env('MIDTRANS_EXPIRY_DURATION_HOURS', 24),
+        'timeout' => (int) env('MIDTRANS_TIMEOUT', 15),
+    ],
+
 ];
