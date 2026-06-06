@@ -29,9 +29,8 @@ return new class extends Migration
             $table->index('status');
             $table->index('ended_at');
             $table->index('course_offering_id');
+            $table->unique(['user_id', 'course_offering_id'], 'enrollments_user_offering_unique');
         });
-
-        DB::statement('CREATE UNIQUE INDEX enrollments_user_offering_unique ON enrollments (user_id, course_offering_id) WHERE course_offering_id IS NOT NULL');
     }
 
     /**
