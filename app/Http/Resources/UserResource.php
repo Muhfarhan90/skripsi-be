@@ -17,6 +17,7 @@ class UserResource extends JsonResource
         return [
             'id' => $this->id,
             'role_id' => $this->role_id,
+            'role_name' => $this->role_name,
             'fullname' => $this->fullname,
             'email' => $this->email,
             'nisn' => $this->nisn,
@@ -28,6 +29,7 @@ class UserResource extends JsonResource
             'date_of_birth' => $this->date_of_birth,
             'school_origin' => $this->school_origin,
             'is_active' => $this->is_active,
+            'orders_count' => $this->whenCounted('orders'),
             'orders' => OrderResource::collection($this->whenLoaded('orders')),
             'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),

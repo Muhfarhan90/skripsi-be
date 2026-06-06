@@ -22,7 +22,8 @@ class UserController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $perPage = (int) $request->query('per_page', 10);
-        $user = $this->service->getAll($search, $perPage);
+        $roleGroup = trim((string) $request->query('role_group', ''));
+        $user = $this->service->getAll($search, $perPage, $roleGroup);
 
         return response()->json([
             'success' => true,
