@@ -271,19 +271,9 @@ class CourseService
 
     private function applyPublishedOfferingScope($query): void
     {
-        $now = now();
-
         $query->where('is_active', true)
-            ->whereHas('academicPeriod', function ($periodQuery) use ($now) {
-                $periodQuery->where('is_active', true)
-                    ->where(function ($builder) use ($now) {
-                        $builder->whereNull('enrollment_open_at')
-                            ->orWhere('enrollment_open_at', '<=', $now);
-                    })
-                    ->where(function ($builder) use ($now) {
-                        $builder->whereNull('enrollment_close_at')
-                            ->orWhere('enrollment_close_at', '>=', $now);
-                    });
+            ->whereHas('academicPeriod', function ($periodQuery) {
+                $periodQuery->where('is_active', true);
             });
     }
 }

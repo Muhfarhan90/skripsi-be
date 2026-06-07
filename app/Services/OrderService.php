@@ -396,19 +396,12 @@ class OrderService
 
     private function resolvePurchasableOfferingIdByCourse(int $courseId): int
     {
-        $now = now();
-
         $offering = CourseOffering::query()
             ->with('academicPeriod')
             ->where('course_id', $courseId)
             ->where('is_active', true)
-            ->whereHas('academicPeriod', function ($query) use ($now) {
-                $query->where('is_active', true)
-                    ->where(function ($builder) use ($now) {
-                        $builder->whereNull('enrollment_open_at')->orWhere('enrollment_open_at', '<=', $now);
-                    })->where(function ($builder) use ($now) {
-                        $builder->whereNull('enrollment_close_at')->orWhere('enrollment_close_at', '>=', $now);
-                    });
+            ->whereHas('academicPeriod', function ($query) {
+                $query->where('is_active', true);
             })
             ->get()
             ->sortBy(function (CourseOffering $offering) {
@@ -462,18 +455,6 @@ class OrderService
         if (! $academicPeriod->is_active) {
             throw ValidationException::withMessages([
                 'course_offering_id' => ['Academic period is not active for this offering'],
-            ]);
-        }
-
-        if ($academicPeriod->enrollment_open_at && $academicPeriod->enrollment_open_at->gt($now)) {
-            throw ValidationException::withMessages([
-                'course_offering_id' => ['Enrollment window has not opened for this offering'],
-            ]);
-        }
-
-        if ($academicPeriod->enrollment_close_at && $academicPeriod->enrollment_close_at->lt($now)) {
-            throw ValidationException::withMessages([
-                'course_offering_id' => ['Enrollment window is closed for this offering'],
             ]);
         }
 
