@@ -29,7 +29,13 @@ class QuizAnswerSeeder extends Seeder
             ->whereHas('enrollment', function ($query) use ($activeStudentId) {
                 $query->where('user_id', $activeStudentId)
                     ->whereHas('courseOffering', function ($offeringQuery) {
-                        $offeringQuery->where('title', 'Intro Programming - Cohort A1 2026');
+                        $offeringQuery
+                            ->whereHas('course', function ($courseQuery) {
+                                $courseQuery->where('slug', 'introduction-to-programming');
+                            })
+                            ->whereHas('academicPeriod', function ($periodQuery) {
+                                $periodQuery->where('code', 'PRE-U-2026-A');
+                            });
                     });
             })
             ->first();
@@ -40,7 +46,13 @@ class QuizAnswerSeeder extends Seeder
             ->whereHas('enrollment', function ($query) use ($activeStudentId) {
                 $query->where('user_id', $activeStudentId)
                     ->whereHas('courseOffering', function ($offeringQuery) {
-                        $offeringQuery->where('title', 'Intro Programming - Cohort A1 2026');
+                        $offeringQuery
+                            ->whereHas('course', function ($courseQuery) {
+                                $courseQuery->where('slug', 'introduction-to-programming');
+                            })
+                            ->whereHas('academicPeriod', function ($periodQuery) {
+                                $periodQuery->where('code', 'PRE-U-2026-A');
+                            });
                     });
             })
             ->first();
@@ -51,7 +63,13 @@ class QuizAnswerSeeder extends Seeder
             ->whereHas('enrollment', function ($query) use ($completedStudentId) {
                 $query->where('user_id', $completedStudentId)
                     ->whereHas('courseOffering', function ($offeringQuery) {
-                        $offeringQuery->where('title', 'Intro Programming - Cohort Legacy 2025');
+                        $offeringQuery
+                            ->whereHas('course', function ($courseQuery) {
+                                $courseQuery->where('slug', 'introduction-to-programming');
+                            })
+                            ->whereHas('academicPeriod', function ($periodQuery) {
+                                $periodQuery->where('code', 'PRE-U-2025-B');
+                            });
                     });
             })
             ->first();

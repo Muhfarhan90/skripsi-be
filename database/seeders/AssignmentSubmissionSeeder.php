@@ -20,11 +20,13 @@ class AssignmentSubmissionSeeder extends Seeder
 
         $activeEnrollment = $this->findEnrollmentByStudentAndOffering(
             (int) $students->get('student@example.com'),
-            'Intro Programming - Cohort A1 2026'
+            'introduction-to-programming',
+            'PRE-U-2026-A'
         );
         $completedEnrollment = $this->findEnrollmentByStudentAndOffering(
             (int) $students->get('student.completed@example.com'),
-            'Intro Programming - Cohort Legacy 2025'
+            'introduction-to-programming',
+            'PRE-U-2025-B'
         );
 
         $activeAssignment = $this->findAssignmentByCourseAndTitle(
@@ -77,7 +79,11 @@ class AssignmentSubmissionSeeder extends Seeder
         }
     }
 
-    private function findEnrollmentByStudentAndOffering(int $studentId, string $offeringTitle): ?Enrollment
+    private function findEnrollmentByStudentAndOffering(
+        int $studentId,
+        string $courseSlug,
+        string $periodCode
+    ): ?Enrollment
     {
         if (! $studentId) {
             return null;
@@ -85,8 +91,14 @@ class AssignmentSubmissionSeeder extends Seeder
 
         return Enrollment::query()
             ->where('user_id', $studentId)
-            ->whereHas('courseOffering', function ($query) use ($offeringTitle) {
-                $query->where('title', $offeringTitle);
+            ->whereHas('courseOffering', function ($query) use ($courseSlug, $periodCode) {
+                $query
+                    ->whereHas('course', function ($courseQuery) use ($courseSlug) {
+                        $courseQuery->where('slug', $courseSlug);
+                    })
+                    ->whereHas('academicPeriod', function ($periodQuery) use ($periodCode) {
+                        $periodQuery->where('code', $periodCode);
+                    });
             })
             ->first();
     }

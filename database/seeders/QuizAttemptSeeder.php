@@ -21,14 +21,26 @@ class QuizAttemptSeeder extends Seeder
         $activeEnrollmentId = Enrollment::query()
             ->where('user_id', $activeStudentId)
             ->whereHas('courseOffering', function ($query) {
-                $query->where('title', 'Intro Programming - Cohort A1 2026');
+                $query
+                    ->whereHas('course', function ($courseQuery) {
+                        $courseQuery->where('slug', 'introduction-to-programming');
+                    })
+                    ->whereHas('academicPeriod', function ($periodQuery) {
+                        $periodQuery->where('code', 'PRE-U-2026-A');
+                    });
             })
             ->value('id');
 
         $completedEnrollmentId = Enrollment::query()
             ->where('user_id', $completedStudentId)
             ->whereHas('courseOffering', function ($query) {
-                $query->where('title', 'Intro Programming - Cohort Legacy 2025');
+                $query
+                    ->whereHas('course', function ($courseQuery) {
+                        $courseQuery->where('slug', 'introduction-to-programming');
+                    })
+                    ->whereHas('academicPeriod', function ($periodQuery) {
+                        $periodQuery->where('code', 'PRE-U-2025-B');
+                    });
             })
             ->value('id');
 
