@@ -6,7 +6,9 @@ use App\Models\Course;
 use App\Models\Lesson;
 use App\Models\Section;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 class CourseService
@@ -85,6 +87,18 @@ class CourseService
                     $this->applyPublishedOfferingScope($query);
                     $query->with('academicPeriod');
                 },
+                'sections' => function ($query) {
+                    $query->orderBy('sort_order')->orderBy('id');
+                },
+                'sections.lessons' => function ($query) {
+                    $query->orderBy('sort_order')->orderBy('id');
+                },
+                'sections.quizzes' => function ($query) {
+                    $query->orderByDesc('id');
+                },
+                'sections.assignments' => function ($query) {
+                    $query->orderBy('due_at')->orderBy('id');
+                },
             ])
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
@@ -121,6 +135,10 @@ class CourseService
         $skillIds = $data['skill_ids'] ?? null;
         unset($data['skill_ids']);
 
+        if (($data['thumbnail'] ?? null) instanceof UploadedFile) {
+            $data['thumbnail'] = $this->storeThumbnail($data['thumbnail']);
+        }
+
         $data['slug'] = Str::slug($data['title']);
         $course = Course::create($data);
         $this->syncSkills($course, is_array($skillIds) ? $skillIds : null);
@@ -137,6 +155,11 @@ class CourseService
         $course = $this->findById($id);
         $skillIds = $data['skill_ids'] ?? null;
         unset($data['skill_ids']);
+
+        if (($data['thumbnail'] ?? null) instanceof UploadedFile) {
+            $this->deleteStoredThumbnail($course->thumbnail);
+            $data['thumbnail'] = $this->storeThumbnail($data['thumbnail']);
+        }
 
         if (isset($data['title'])) {
             $data['slug'] = Str::slug($data['title']);
@@ -275,5 +298,28 @@ class CourseService
             ->whereHas('academicPeriod', function ($periodQuery) {
                 $periodQuery->where('is_active', true);
             });
+    }
+
+    private function storeThumbnail(UploadedFile $file): string
+    {
+        $filename = 'course-thumbnail-' . now()->format('YmdHis') . '-' . Str::random(8) . '.' . $file->extension();
+        $path = $file->storeAs('course-thumbnails', $filename, 'public');
+
+        if (! $path) {
+            throw ValidationException::withMessages([
+                'thumbnail' => ['Gagal mengupload thumbnail course.'],
+            ]);
+        }
+
+        return '/storage/' . ltrim($path, '/');
+    }
+
+    private function deleteStoredThumbnail(?string $path): void
+    {
+        if (! $path || ! Str::startsWith($path, '/storage/course-thumbnails/')) {
+            return;
+        }
+
+        Storage::disk('public')->delete(Str::after($path, '/storage/'));
     }
 }

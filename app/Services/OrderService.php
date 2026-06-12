@@ -199,7 +199,7 @@ class OrderService
             $offeringIds = $this->normalizeRequestedOfferingIds($data);
             if (count($offeringIds) === 0) {
                 throw ValidationException::withMessages([
-                    'course_offering_ids' => ['No valid course offerings provided'],
+                    'course_offering_ids' => ['Kelas yang dipilih belum tersedia untuk dibeli.'],
                 ]);
             }
 
@@ -210,7 +210,7 @@ class OrderService
 
             if ($offerings->count() !== count($offeringIds)) {
                 throw ValidationException::withMessages([
-                    'course_offering_ids' => ['Some course offerings were not found'],
+                    'course_offering_ids' => ['Sebagian kelas yang dipilih tidak ditemukan atau sudah tidak tersedia.'],
                 ]);
             }
 
@@ -311,7 +311,7 @@ class OrderService
     private function applyVoucher(Voucher $voucher, float $subtotal): array
     {
         if (! $voucher->is_active || ($voucher->expired_at && $voucher->expired_at->isPast())) {
-            throw ValidationException::withMessages(['voucher_code' => 'Voucher is inactive or expired.']);
+            throw ValidationException::withMessages(['voucher_code' => ['Voucher sudah tidak aktif atau masa berlakunya telah berakhir.']]);
         }
 
         if ($voucher->usage_limit > 0) {
@@ -320,13 +320,13 @@ class OrderService
                 ->count();
 
             if ($usedCount >= $voucher->usage_limit) {
-                throw ValidationException::withMessages(['voucher_code' => 'Voucher usage limit reached.']);
+                throw ValidationException::withMessages(['voucher_code' => ['Voucher sudah mencapai batas penggunaan.']]);
             }
         }
 
         if ($subtotal < $voucher->min_purchase) {
             throw ValidationException::withMessages([
-                'voucher_code' => "Minimum purchase of {$voucher->min_purchase} required for this voucher.",
+                'voucher_code' => ['Minimum pembelian untuk voucher ini belum terpenuhi.'],
             ]);
         }
 
@@ -411,7 +411,7 @@ class OrderService
 
         if (! $offering) {
             throw ValidationException::withMessages([
-                'course_id' => ["No active offering is currently available for course ID: {$courseId}"],
+                'course_id' => ['Kelas ini belum memiliki periode belajar yang aktif untuk dibeli.'],
             ]);
         }
 
@@ -429,7 +429,7 @@ class OrderService
         }
 
         throw ValidationException::withMessages([
-            'course_offering_id' => ['Order item is missing course offering reference'],
+            'course_offering_id' => ['Item pesanan tidak memiliki referensi kelas yang valid.'],
         ]);
     }
 
@@ -442,19 +442,19 @@ class OrderService
 
         if (! $course) {
             throw ValidationException::withMessages([
-                'course_offering_id' => ['Offering does not have a valid course'],
+                'course_offering_id' => ['Kelas yang dipilih tidak memiliki data course yang valid.'],
             ]);
         }
 
         if (! $offering->is_active) {
             throw ValidationException::withMessages([
-                'course_offering_id' => ['Course offering is not available for purchase'],
+                'course_offering_id' => ['Kelas ini sedang tidak tersedia untuk dibeli.'],
             ]);
         }
 
         if (! $academicPeriod->is_active) {
             throw ValidationException::withMessages([
-                'course_offering_id' => ['Academic period is not active for this offering'],
+                'course_offering_id' => ['Periode belajar untuk kelas ini sedang tidak aktif.'],
             ]);
         }
 
@@ -471,7 +471,7 @@ class OrderService
 
             if ($enrolledCount >= $offering->capacity) {
                 throw ValidationException::withMessages([
-                    'course_offering_id' => ['Course offering capacity has been reached'],
+                    'course_offering_id' => ['Kuota kelas ini sudah penuh.'],
                 ]);
             }
         }
@@ -485,7 +485,7 @@ class OrderService
 
         if ($hasCompletedEnrollment) {
             throw ValidationException::withMessages([
-                'course_id' => ["User already completed course ID: {$course->id}"],
+                'course_id' => ['Anda sudah menyelesaikan kelas ini.'],
             ]);
         }
 
@@ -507,7 +507,7 @@ class OrderService
 
         if ($hasCurrentAccess) {
             throw ValidationException::withMessages([
-                'course_id' => ["User already has pending or active enrollment for course ID: {$course->id}"],
+                'course_id' => ['Anda masih memiliki akses aktif ke kelas ini.'],
             ]);
         }
 
@@ -522,7 +522,7 @@ class OrderService
 
         if ($pendingOrCompletedOrderQuery->exists()) {
             throw ValidationException::withMessages([
-                'course_offering_id' => ["User already has pending or completed order for offering ID: {$offeringId}"],
+                'course_offering_id' => ['Anda sudah memiliki pesanan untuk kelas ini. Selesaikan atau cek pesanan sebelumnya di halaman Orders.'],
             ]);
         }
     }
@@ -577,7 +577,7 @@ class OrderService
 
         if (! $offering->academicPeriod) {
             throw ValidationException::withMessages([
-                'course_offering_id' => ['Offering does not have a valid academic period'],
+                'course_offering_id' => ['Kelas ini belum terhubung ke periode belajar yang valid.'],
             ]);
         }
 

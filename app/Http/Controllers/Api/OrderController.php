@@ -9,6 +9,7 @@ use App\Http\Requests\Order\UploadPaymentProofRequest;
 use App\Http\Resources\OrderResource;
 use App\Services\OrderService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
@@ -55,10 +56,16 @@ class OrderController extends Controller
                 'message' => 'Order created successfully. Please complete the payment.',
                 'data' => new OrderResource($order),
             ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first() ?? 'Data pesanan tidak valid.',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Pesanan tidak dapat diproses saat ini. Silakan coba lagi.',
             ], 422);
         }
     }
@@ -108,10 +115,16 @@ class OrderController extends Controller
                 'message' => 'Payment submission updated successfully',
                 'data' => new OrderResource($order),
             ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first() ?? 'Data pembayaran tidak valid.',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Data pembayaran tidak dapat diproses saat ini. Silakan coba lagi.',
             ], 422);
         }
     }

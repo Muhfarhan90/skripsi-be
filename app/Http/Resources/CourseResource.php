@@ -50,6 +50,78 @@ class CourseResource extends JsonResource
                 : [],
             'requirements' => $this->requirements,
             'outcomes' => $this->outcomes,
+            'sections' => $this->relationLoaded('sections')
+                ? $this->sections
+                    ->sortBy('sort_order')
+                    ->values()
+                    ->map(function ($section) {
+                        return [
+                            'id' => $section->id,
+                            'course_id' => $section->course_id,
+                            'title' => $section->title,
+                            'sort_order' => $section->sort_order,
+                            'lessons' => $section->relationLoaded('lessons')
+                                ? $section->lessons
+                                    ->sortBy('sort_order')
+                                    ->values()
+                                    ->map(function ($lesson) {
+                                        return [
+                                            'id' => $lesson->id,
+                                            'section_id' => $lesson->section_id,
+                                            'title' => $lesson->title,
+                                            'description' => $lesson->description,
+                                            'type' => $lesson->type,
+                                            'lesson_url' => $lesson->lesson_url,
+                                            'duration' => $lesson->duration,
+                                            'sort_order' => $lesson->sort_order,
+                                            'is_preview' => (bool) $lesson->is_preview,
+                                        ];
+                                    })
+                                : [],
+                            'quizzes' => $section->relationLoaded('quizzes')
+                                ? $section->quizzes
+                                    ->sortByDesc('id')
+                                    ->values()
+                                    ->map(function ($quiz) {
+                                        return [
+                                            'id' => $quiz->id,
+                                            'course_id' => $quiz->course_id,
+                                            'section_id' => $quiz->section_id,
+                                            'title' => $quiz->title,
+                                            'description' => $quiz->description,
+                                            'duration' => $quiz->duration,
+                                            'passing_score' => $quiz->passing_score,
+                                            'weight' => $quiz->weight,
+                                            'is_active' => $quiz->is_active,
+                                            'is_random' => $quiz->is_random,
+                                            'max_attempts' => $quiz->max_attempts,
+                                        ];
+                                    })
+                                : [],
+                            'assignments' => $section->relationLoaded('assignments')
+                                ? $section->assignments
+                                    ->sortBy(function ($assignment) {
+                                        return $assignment->due_at?->getTimestamp() ?? PHP_INT_MAX;
+                                    })
+                                    ->values()
+                                    ->map(function ($assignment) {
+                                        return [
+                                            'id' => $assignment->id,
+                                            'course_id' => $assignment->course_id,
+                                            'section_id' => $assignment->section_id,
+                                            'title' => $assignment->title,
+                                            'description' => $assignment->description,
+                                            'instructions' => $assignment->instructions,
+                                            'is_required_for_certificate' => (bool) $assignment->is_required_for_certificate,
+                                            'allow_resubmission' => (bool) $assignment->allow_resubmission,
+                                            'max_attempts' => $assignment->max_attempts,
+                                            'status' => $assignment->status,
+                                        ];
+                                    })
+                                : [],
+                        ];
+                    })
+                : [],
             'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
     }
