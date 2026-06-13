@@ -16,7 +16,7 @@ class UpsertWebsiteSocialLinkRequest extends FormRequest
         return [
             'label' => ['required', 'string', 'max:80'],
             'url' => ['required', 'url', 'max:255'],
-            'icon' => ['nullable', 'string', 'max:80'],
+            'icon' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
         ];
     }

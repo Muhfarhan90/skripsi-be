@@ -25,6 +25,21 @@ class WebsiteSettingService
         return $settings->fresh();
     }
 
+    public function uploadWebsiteAsset(\Illuminate\Http\UploadedFile $file, string $type): string
+    {
+        $directory = 'website-assets';
+        $filename = $type . '-' . now()->format('YmdHis') . '-' . \Illuminate\Support\Str::random(8) . '.' . $file->extension();
+        $path = $file->storeAs($directory, $filename, 'public');
+
+        if (! $path) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'file' => ['Website asset upload failed.'],
+            ]);
+        }
+
+        return '/storage/' . ltrim($path, '/');
+    }
+
     public function getHomePayload(bool $admin = false): array
     {
         $this->ensureDefaultContent();
@@ -195,6 +210,14 @@ class WebsiteSettingService
 
     private function cleanupLegacyDefaultContent(): void
     {
+        WebsiteSetting::query()
+            ->where('site_name', 'SkripsiLMS')
+            ->where('site_tagline', 'Platform Belajar Pre-University')
+            ->where('footer_text', 'Copyright {year} {site_name} - Platform Belajar Pre-University')
+            ->update([
+                'site_name' => 'Platform Belajar',
+            ]);
+
         WebsiteSection::query()
             ->where('section_key', 'gallery')
             ->where(function ($query) {
@@ -240,7 +263,7 @@ class WebsiteSettingService
     private function settingsDefaults(): array
     {
         return [
-            'site_name' => 'SkripsiLMS',
+            'site_name' => 'Platform Belajar',
             'site_tagline' => 'Platform Belajar Pre-University',
             'logo_url' => null,
             'footer_text' => 'Copyright {year} {site_name} - Platform Belajar Pre-University',
@@ -374,7 +397,7 @@ class WebsiteSettingService
             [
                 'slug' => 'about-us',
                 'title' => 'Tentang Kami',
-                'content' => 'SkripsiLMS menyediakan materi, kuis, forum diskusi, dan sertifikat untuk membantu siswa mempersiapkan diri masuk universitas. Halaman ini dapat disesuaikan melalui admin Website CMS agar sesuai dengan profil institusi.',
+                'content' => 'Platform ini menyediakan materi, kuis, forum diskusi, dan sertifikat untuk membantu siswa mempersiapkan diri masuk universitas. Halaman ini dapat disesuaikan melalui admin Website CMS agar sesuai dengan profil institusi.',
                 'is_active' => true,
             ],
             [

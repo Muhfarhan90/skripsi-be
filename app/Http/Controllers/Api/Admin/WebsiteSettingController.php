@@ -41,4 +41,25 @@ class WebsiteSettingController extends Controller
             ),
         ]);
     }
+
+    public function uploadAsset(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'type' => ['required', 'string', 'max:50'],
+        ]);
+
+        $path = $this->websiteSettingService->uploadWebsiteAsset(
+            $request->file('file'),
+            (string) $request->input('type')
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Website asset uploaded successfully',
+            'data' => [
+                'path' => $path,
+            ],
+        ]);
+    }
 }

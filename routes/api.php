@@ -59,6 +59,35 @@ Route::get('/user', function (Request $request) {
     ], $user ? 200 : 401);
 })->middleware('auth:sanctum');
 
+Route::put('/user', function (Request $request) {
+    $user = $request->user();
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated',
+        ], 401);
+    }
+
+    $validated = $request->validate([
+        'fullname' => ['required', 'string', 'max:255'],
+        'phone' => ['nullable', 'string', 'max:20'],
+        'address' => ['nullable', 'string', 'max:255'],
+        'bio' => ['nullable', 'string'],
+        'gender' => ['nullable', 'string', 'in:laki,perempuan'],
+        'date_of_birth' => ['nullable', 'date'],
+        'school_origin' => ['nullable', 'string', 'max:255'],
+        'nisn' => ['nullable', 'string', 'max:20', 'unique:users,nisn,' . $user->id],
+    ]);
+
+    $user->update($validated);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Profile updated successfully',
+        'data' => new UserResource($user->loadMissing('role')),
+    ]);
+})->middleware('auth:sanctum');
+
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->name('auth.register');
     // Signed GET route for email verification (used by VerifyApiEmail notification)
@@ -192,6 +221,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'activity-log-causer', 'admi
     Route::post('/certificate-settings/assets', [CertificateSettingController::class, 'uploadAsset']);
     Route::get('/website-settings', [AdminWebsiteSettingController::class, 'show']);
     Route::put('/website-settings', [AdminWebsiteSettingController::class, 'update']);
+    Route::post('/website-settings/assets', [AdminWebsiteSettingController::class, 'uploadAsset']);
     Route::get('/website/home', [AdminWebsiteSettingController::class, 'home']);
 
     Route::get('/enrollments/{enrollmentId}/lesson-progress', [AdminLessonProgressController::class, 'index']);
