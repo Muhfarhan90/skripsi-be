@@ -17,12 +17,10 @@ class Transaction extends Model
         'payment_channel',
         'payment_url',
         'payment_reference',
-        'payment_proof',
         'amount',
         'status',
         'paid_at',
         'expired_at',
-        'verified_by'
     ];
 
     protected $casts = [
@@ -33,10 +31,5 @@ class Transaction extends Model
     public function order()
     {
         return $this->belongsTo(Order::class, 'order_id');
-    }
-
-    public function verifier()
-    {
-        return $this->belongsTo(User::class, 'verified_by');
     }
 }

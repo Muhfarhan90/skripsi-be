@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Order\SubmitPaymentRequest;
 use App\Http\Requests\Order\StoreOrderRequest;
-use App\Http\Requests\Order\UploadPaymentProofRequest;
 use App\Http\Resources\OrderResource;
 use App\Services\OrderService;
 use Illuminate\Http\Request;
@@ -70,19 +68,6 @@ class OrderController extends Controller
         }
     }
 
-    public function uploadPaymentProof(UploadPaymentProofRequest $request)
-    {
-        $path = $this->service->uploadPaymentProof($request->file('file'));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Payment proof uploaded successfully',
-            'data' => [
-                'path' => $path,
-            ],
-        ]);
-    }
-
     public function show(Request $request, string $id)
     {
         try {
@@ -98,34 +83,6 @@ class OrderController extends Controller
                 'success' => false,
                 'message' => 'Order not found or access denied',
             ], 404);
-        }
-    }
-
-    public function submitPayment(SubmitPaymentRequest $request, string $id)
-    {
-        try {
-            $order = $this->service->submitPaymentByStudent(
-                (int) $request->user()->id,
-                (int) $id,
-                $request->validated(),
-            );
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Payment submission updated successfully',
-                'data' => new OrderResource($order),
-            ]);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => collect($e->errors())->flatten()->first() ?? 'Data pembayaran tidak valid.',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data pembayaran tidak dapat diproses saat ini. Silakan coba lagi.',
-            ], 422);
         }
     }
 }

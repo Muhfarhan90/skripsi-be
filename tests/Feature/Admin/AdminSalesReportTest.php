@@ -118,12 +118,10 @@ function createSalesReportOrder(array $attributes): array
         'payment_channel' => $attributes['payment_channel'] ?? 'bank_transfer',
         'payment_url' => null,
         'payment_reference' => $attributes['payment_reference'] ?? null,
-        'payment_proof' => $attributes['payment_proof'] ?? null,
         'amount' => $attributes['amount'] ?? $grandTotal,
         'status' => $attributes['transaction_status'] ?? 'success',
         'paid_at' => $attributes['paid_at'] ?? null,
         'expired_at' => $attributes['expired_at'] ?? '2026-06-20 02:00:00',
-        'verified_by' => null,
     ]);
     $transaction->forceFill([
         'created_at' => $transactionCreatedAt,

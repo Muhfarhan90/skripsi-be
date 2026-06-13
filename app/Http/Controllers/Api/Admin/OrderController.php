@@ -60,7 +60,6 @@ class OrderController extends Controller
                 'Metode Pembayaran Terakhir',
                 'Invoice Terakhir',
                 'Referensi Pembayaran Terakhir',
-                'Bukti Pembayaran Terakhir',
                 'Dibayar Pada',
                 'Catatan',
             ],

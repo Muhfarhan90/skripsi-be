@@ -563,7 +563,6 @@ class CertificateDemoCourseSeeder extends Seeder
                 'status' => 'success',
                 'paid_at' => now()->subDays(2),
                 'expired_at' => null,
-                'verified_by' => null,
             ]
         );
 

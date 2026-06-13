@@ -267,7 +267,6 @@ class TransactionService
             'Status Order' => $transaction->order?->status ?? '',
             'Nama Siswa' => $transaction->order?->user?->fullname ?? '',
             'Email Siswa' => $transaction->order?->user?->email ?? '',
-            'Bukti Pembayaran' => $transaction->payment_proof ?? '',
             'Dibayar Pada' => $this->formatAdminExportDate($transaction->paid_at),
             'Kedaluwarsa Pada' => $this->formatAdminExportDate($transaction->expired_at),
         ];

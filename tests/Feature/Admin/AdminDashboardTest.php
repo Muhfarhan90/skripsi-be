@@ -129,12 +129,10 @@ it('returns real admin dashboard metrics from database data', function () {
         'payment_channel' => 'bank_transfer',
         'payment_url' => null,
         'payment_reference' => 'REF-DASH-001',
-        'payment_proof' => null,
         'amount' => 400000,
         'status' => 'success',
         'paid_at' => '2026-05-24 10:00:00',
         'expired_at' => '2026-05-25 10:00:00',
-        'verified_by' => $admin->id,
         'created_at' => '2026-05-24 09:30:00',
         'updated_at' => '2026-05-24 09:30:00',
     ]);

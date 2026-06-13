@@ -185,42 +185,6 @@ class NotificationService
         }
     }
 
-    public function publishManualPaymentSubmitted(Transaction $transaction): void
-    {
-        $transaction->loadMissing('order.user');
-        $order = $transaction->order;
-
-        if (! $order || ! $order->user) {
-            return;
-        }
-
-        $student = $order->user;
-        $adminRecipients = $this->getAdminRecipients();
-
-        foreach ($adminRecipients as $adminRecipient) {
-            $this->saveUniqueNotification([
-                'user_id' => $adminRecipient->id,
-                'type' => 'payment.submitted',
-                'reference_type' => 'transaction',
-                'reference_id' => $transaction->id,
-            ], [
-                'title' => 'Pembayaran baru perlu direview',
-                'body' => $student->fullname . ' mengirim bukti pembayaran untuk order ' . $order->order_code . '.',
-                'data' => [
-                    'transaction_id' => $transaction->id,
-                    'order_id' => $order->id,
-                    'order_code' => $order->order_code,
-                    'student_id' => $student->id,
-                    'student_name' => $student->fullname,
-                    'route' => '/admin/orders',
-                ],
-                'actor_id' => $student->id,
-                'read_at' => null,
-                'sent_at' => now(),
-            ]);
-        }
-    }
-
     public function publishAssignmentSubmitted(AssignmentSubmission $submission): void
     {
         $submission->loadMissing([

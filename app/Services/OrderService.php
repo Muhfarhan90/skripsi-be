@@ -144,51 +144,6 @@ class OrderService
             ->findOrFail($id);
     }
 
-    public function uploadPaymentProof(UploadedFile $file): string
-    {
-        $directory = 'payment-proofs';
-        $filename = 'payment-proof-' . now()->format('YmdHis') . '-' . Str::random(8) . '.' . $file->extension();
-        $path = $file->storeAs($directory, $filename, 'public');
-
-        if (! $path) {
-            throw ValidationException::withMessages([
-                'file' => ['Payment proof upload failed.'],
-            ]);
-        }
-
-        return $path;
-    }
-
-    public function submitPaymentByStudent(int $userId, int $orderId, array $data): Order
-    {
-        return DB::transaction(function () use ($userId, $orderId, $data) {
-            $order = Order::where('id', $orderId)
-                ->where('user_id', $userId)
-                ->where('status', 'pending')
-                ->firstOrFail();
-
-            $transaction = $order->transactions()->latest('id')->first();
-            if (! $transaction) {
-                $transaction = $this->transactionService->create([
-                    'order_id' => $order->id,
-                    'amount' => $order->grand_total,
-                    'status' => 'pending',
-                    'payment_method' => 'manual',
-                    'paid_at' => null,
-                ]);
-            }
-
-            $transaction->update([
-                'payment_reference' => $data['payment_reference'] ?? $transaction->payment_reference,
-                'payment_proof' => $data['payment_proof'] ?? $transaction->payment_proof,
-            ]);
-
-            $this->notificationService->publishManualPaymentSubmitted($transaction->fresh());
-
-            return $this->freshOrderWithRelations($order->id);
-        });
-    }
-
     public function create(array $data)
     {
         return DB::transaction(function () use ($data) {
@@ -270,7 +225,6 @@ class OrderService
                 },
                 'payment_method' => $paymentMethod,
                 'payment_reference' => $data['payment_reference'] ?? null,
-                'payment_proof' => $data['payment_proof'] ?? null,
                 'paid_at' => $status === 'completed' ? now() : null,
             ]);
 
@@ -661,7 +615,6 @@ class OrderService
             'Metode Pembayaran Terakhir' => $paymentMethod,
             'Invoice Terakhir' => $latestTransaction?->invoice_code ?? '',
             'Referensi Pembayaran Terakhir' => $paymentReference,
-            'Bukti Pembayaran Terakhir' => $latestTransaction?->payment_proof ?? '',
             'Dibayar Pada' => $this->formatAdminExportDate($latestTransaction?->paid_at),
             'Catatan' => $order->note ?? '',
         ];

@@ -110,9 +110,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
-    Route::post('/orders/payment-proof-upload', [OrderController::class, 'uploadPaymentProof']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
-    Route::patch('/orders/{id}/payment-submission', [OrderController::class, 'submitPayment']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);

@@ -126,12 +126,10 @@ function createReportOrderWithTransaction(array $overrides = []): array
         'payment_channel' => $overrides['payment_channel'] ?? 'bank_transfer',
         'payment_url' => null,
         'payment_reference' => $overrides['payment_reference'] ?? 'REF-REPORT-001',
-        'payment_proof' => $overrides['payment_proof'] ?? 'https://example.com/proof-report-001.jpg',
         'amount' => $overrides['amount'] ?? 400000,
         'status' => $overrides['transaction_status'] ?? 'success',
         'paid_at' => $overrides['paid_at'] ?? '2026-05-24 09:15:00',
         'expired_at' => $overrides['expired_at'] ?? '2026-05-25 09:15:00',
-        'verified_by' => null,
         'created_at' => $overrides['transaction_created_at'] ?? '2026-05-24 09:00:00',
         'updated_at' => $overrides['transaction_created_at'] ?? '2026-05-24 09:00:00',
     ]);

@@ -65,7 +65,6 @@ class TransactionController extends Controller
                 'Status Order',
                 'Nama Siswa',
                 'Email Siswa',
-                'Bukti Pembayaran',
                 'Dibayar Pada',
                 'Kedaluwarsa Pada',
             ],
