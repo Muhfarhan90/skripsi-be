@@ -100,23 +100,58 @@ class AcademicPeriodController extends Controller
 
     private function indexQuery(): Builder
     {
+        $actor = auth()->user();
+        $isInstructor = false;
+        if ($actor) {
+            $actor->loadMissing('role');
+            $isInstructor = $actor->role?->name === 'instructor';
+        }
+
         return AcademicPeriod::query()
-            ->withCount('courseOfferings')
+            ->withCount([
+                'courseOfferings' => function ($q) use ($isInstructor, $actor) {
+                    $q->when($isInstructor, function ($qInner) use ($actor) {
+                        $qInner->whereHas('course', function ($courseQuery) use ($actor) {
+                            $courseQuery->where('instructor_id', $actor->id);
+                        });
+                    });
+                }
+            ])
             ->orderByDesc('start_at')
             ->orderByDesc('id');
     }
 
     private function detailQuery(): Builder
     {
+        $actor = auth()->user();
+        $isInstructor = false;
+        if ($actor) {
+            $actor->loadMissing('role');
+            $isInstructor = $actor->role?->name === 'instructor';
+        }
+
         return AcademicPeriod::query()
-            ->withCount('courseOfferings')
+            ->withCount([
+                'courseOfferings' => function ($q) use ($isInstructor, $actor) {
+                    $q->when($isInstructor, function ($qInner) use ($actor) {
+                        $qInner->whereHas('course', function ($courseQuery) use ($actor) {
+                            $courseQuery->where('instructor_id', $actor->id);
+                        });
+                    });
+                }
+            ])
             ->with([
-                'courseOfferings' => function ($query) {
+                'courseOfferings' => function ($query) use ($isInstructor, $actor) {
                     $query->withCount('enrollments')
                         ->with([
-                            'course:id,title,slug,category_id',
+                            'course:id,title,slug,category_id,instructor_id',
                             'course.category:id,name',
                         ])
+                        ->when($isInstructor, function ($q) use ($actor) {
+                            $q->whereHas('course', function ($courseQuery) use ($actor) {
+                                $q->where('instructor_id', $actor->id);
+                            });
+                        })
                         ->orderByDesc('id');
                 },
             ]);

@@ -106,6 +106,7 @@ Route::prefix('auth')->middleware('auth:sanctum')->group(function () {
 
 Route::get('/courses', [CourseCatalogController::class, 'index']);
 Route::get('/courses/{slug}', [CourseCatalogController::class, 'show']);
+Route::get('/courses/{courseId}/reviews', [ReviewController::class, 'index']);
 Route::get('/website-settings', [WebsiteSettingController::class, 'show']);
 Route::get('/website/home', [WebsiteSettingController::class, 'home']);
 Route::get('/website/pages/{slug}', [WebsiteSettingController::class, 'page']);
@@ -156,7 +157,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/forum-replies/{replyId}', [ForumController::class, 'destroyReply']);
 
     // Reviews
-    Route::get('/courses/{courseId}/reviews', [ReviewController::class, 'index']);
     Route::post('/courses/{courseId}/reviews', [ReviewController::class, 'store']);
     Route::put('/courses/{courseId}/reviews/{reviewId}', [ReviewController::class, 'update']);
     Route::delete('/courses/{courseId}/reviews/{reviewId}', [ReviewController::class, 'destroy']);

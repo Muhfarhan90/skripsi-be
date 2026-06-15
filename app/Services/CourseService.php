@@ -17,13 +17,19 @@ class CourseService
     {
         $perPage = max($perPage, 1);
 
-        return Course::query()
+        $query = Course::query()
             ->with([
                 'category:id,name',
                 'instructor:id,fullname',
                 'skills:id,name,slug',
-            ])
-            ->when($search !== '', function ($query) use ($search) {
+            ]);
+
+        $user = auth()->user();
+        if ($user && $user->role_name === 'instructor') {
+            $query->where('instructor_id', $user->id);
+        }
+
+        return $query->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($builder) use ($search) {
                     $builder->where('title', 'like', "%{$search}%")
                         ->orWhere('slug', 'like', "%{$search}%")
@@ -67,13 +73,19 @@ class CourseService
 
     public function findById(int $id)
     {
-        return Course::query()
+        $query = Course::query()
             ->with([
                 'category:id,name',
                 'instructor:id,fullname',
                 'skills:id,name,slug',
-            ])
-            ->findOrFail($id);
+            ]);
+
+        $user = auth()->user();
+        if ($user && $user->role_name === 'instructor') {
+            $query->where('instructor_id', $user->id);
+        }
+
+        return $query->findOrFail($id);
     }
 
     public function findPublishedBySlug(string $slug): Course
@@ -111,7 +123,7 @@ class CourseService
 
     public function findByIdWithCurriculum(int $id)
     {
-        return Course::with([
+        $query = Course::with([
             'category:id,name',
             'instructor:id,fullname',
             'skills:id,name,slug',
@@ -127,7 +139,14 @@ class CourseService
             'sections.assignments' => function ($query) {
                 $query->orderBy('due_at')->orderBy('id');
             },
-        ])->findOrFail($id);
+        ]);
+
+        $user = auth()->user();
+        if ($user && $user->role_name === 'instructor') {
+            $query->where('instructor_id', $user->id);
+        }
+
+        return $query->findOrFail($id);
     }
 
     public function create(array $data)
@@ -140,6 +159,13 @@ class CourseService
         }
 
         $data['slug'] = Str::slug($data['title']);
+
+        // Force instructor_id if user is an instructor
+        $user = auth()->user();
+        if ($user && $user->role_name === 'instructor') {
+            $data['instructor_id'] = $user->id;
+        }
+
         $course = Course::create($data);
         $this->syncSkills($course, is_array($skillIds) ? $skillIds : null);
 
@@ -164,6 +190,13 @@ class CourseService
         if (isset($data['title'])) {
             $data['slug'] = Str::slug($data['title']);
         }
+
+        // Force instructor_id if user is an instructor
+        $user = auth()->user();
+        if ($user && $user->role_name === 'instructor') {
+            $data['instructor_id'] = $user->id;
+        }
+
         $course->update($data);
         $this->syncSkills($course, is_array($skillIds) ? $skillIds : null);
 
