@@ -51,7 +51,8 @@ return [
             'trim',
             explode(',', env('MIDTRANS_ENABLED_PAYMENTS', 'bni_va'))
         ))),
-        'expiry_duration_hours' => (int) env('MIDTRANS_EXPIRY_DURATION_HOURS', 24),
+        'expiry_unit' => env('MIDTRANS_EXPIRY_UNIT', 'hour'),
+        'expiry_duration' => (int) env('MIDTRANS_EXPIRY_DURATION', 24),
         'timeout' => (int) env('MIDTRANS_TIMEOUT', 15),
     ],
 

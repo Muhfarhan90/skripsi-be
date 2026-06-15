@@ -236,7 +236,16 @@ class OrderService
                     'payment_channel' => collect(config('services.midtrans.enabled_payments', []))->first(),
                     'payment_url' => $snapTransaction['redirect_url'],
                     'payment_reference' => $snapTransaction['token'] ?? $transaction->payment_reference,
-                    'expired_at' => now()->addHours(max(1, (int) config('services.midtrans.expiry_duration_hours', 24))),
+                    'expired_at' => (function() {
+                        $unit = config('services.midtrans.expiry_unit', 'hour');
+                        $duration = max(1, (int) config('services.midtrans.expiry_duration', 24));
+                        
+                        return match ($unit) {
+                            'minute' => now()->addMinutes($duration),
+                            'day' => now()->addDays($duration),
+                            default => now()->addHours($duration),
+                        };
+                    })(),
                 ]);
             }
 

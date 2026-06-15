@@ -63,8 +63,8 @@ class MidtransPaymentService
                     'finish' => $this->finishRedirectUrl($order),
                 ],
                 'expiry' => [
-                    'unit' => 'hour',
-                    'duration' => max(1, (int) config('services.midtrans.expiry_duration_hours', 24)),
+                    'unit' => config('services.midtrans.expiry_unit', 'hour'),
+                    'duration' => max(1, (int) config('services.midtrans.expiry_duration', 24)),
                 ],
             ]);
 
