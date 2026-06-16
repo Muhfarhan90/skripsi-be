@@ -18,6 +18,12 @@ class LessonService
 
     public function create(array $data)
     {
+        if (isset($data['lesson_file']) && $data['lesson_file'] instanceof \Illuminate\Http\UploadedFile) {
+            $path = $data['lesson_file']->store('lessons', 'public');
+            $data['lesson_url'] = '/storage/' . $path;
+            unset($data['lesson_file']);
+        }
+
         if (!isset($data['sort_order']) || $data['sort_order'] == 0) {
             $data['sort_order'] = Lesson::where('section_id', $data['section_id'])
                 ->max('sort_order') + 1;
@@ -29,6 +35,12 @@ class LessonService
     public function update(int $id, array $data)
     {
         $lesson = $this->findById($id);
+
+        if (isset($data['lesson_file']) && $data['lesson_file'] instanceof \Illuminate\Http\UploadedFile) {
+            $path = $data['lesson_file']->store('lessons', 'public');
+            $data['lesson_url'] = '/storage/' . $path;
+            unset($data['lesson_file']);
+        }
 
         if (isset($data['sort_order']) && $data['sort_order'] != $lesson->sort_order) {
             $this->handleReorder($lesson, $data['sort_order']);
