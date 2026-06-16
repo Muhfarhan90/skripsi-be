@@ -55,7 +55,7 @@ class CourseService
         return Course::query()
             ->with([
                 'category:id,name',
-                'instructor:id,fullname,bio',
+                'instructor:id,fullname,bio,avatar',
                 'skills:id,name,slug',
                 'courseOfferings' => function ($query) {
                     $this->applyPublishedOfferingScope($query);
@@ -93,7 +93,7 @@ class CourseService
         return Course::query()
             ->with([
                 'category:id,name',
-                'instructor:id,fullname,bio',
+                'instructor:id,fullname,bio,avatar',
                 'skills:id,name,slug',
                 'courseOfferings' => function ($query) {
                     $this->applyPublishedOfferingScope($query);

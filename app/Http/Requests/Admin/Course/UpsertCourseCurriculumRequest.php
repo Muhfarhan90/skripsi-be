@@ -38,7 +38,7 @@ class UpsertCourseCurriculumRequest extends FormRequest
             'sections.*.lessons.*.title' => ['required_with:sections.*.lessons', 'string', 'max:255'],
             'sections.*.lessons.*.description' => ['nullable', 'string'],
             'sections.*.lessons.*.type' => ['required_with:sections.*.lessons', 'in:video,file'],
-            'sections.*.lessons.*.lesson_url' => ['nullable', 'url'],
+            'sections.*.lessons.*.lesson_url' => ['nullable', 'string'],
             'sections.*.lessons.*.duration' => ['nullable', 'integer', 'min:0'],
             'sections.*.lessons.*.sort_order' => ['nullable', 'integer', 'min:1'],
             'sections.*.lessons.*.is_preview' => ['nullable', 'boolean'],

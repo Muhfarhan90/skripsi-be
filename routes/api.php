@@ -77,7 +77,16 @@ Route::put('/user', function (Request $request) {
         'date_of_birth' => ['nullable', 'date'],
         'school_origin' => ['nullable', 'string', 'max:255'],
         'nisn' => ['nullable', 'string', 'max:20', 'unique:users,nisn,' . $user->id],
+        'avatar' => ['nullable', 'image', 'max:2048'],
     ]);
+
+    if ($request->hasFile('avatar')) {
+        if ($user->avatar) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete(str_replace('/storage/', '', $user->avatar));
+        }
+        $path = $request->file('avatar')->store('avatars', 'public');
+        $validated['avatar'] = '/storage/' . $path;
+    }
 
     $user->update($validated);
 
