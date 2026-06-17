@@ -265,6 +265,25 @@ class OrderService
         });
     }
 
+    public function checkVoucherValidity(string $code, float $subtotal): array
+    {
+        $voucher = Voucher::where('code', $code)->first();
+
+        if (!$voucher) {
+            throw ValidationException::withMessages(['voucher_code' => ['Voucher tidak ditemukan.']]);
+        }
+
+        $discountData = $this->applyVoucher($voucher, $subtotal);
+
+        return [
+            'id' => $voucher->id,
+            'code' => $voucher->code,
+            'discount_type' => $voucher->discount_type,
+            'discount_amount' => (float)$voucher->discount_amount,
+            'discount' => (float)$discountData['discount'],
+        ];
+    }
+
     /*
     |--------------------------------------------------------------------------
     | PRIVATE HELPERS

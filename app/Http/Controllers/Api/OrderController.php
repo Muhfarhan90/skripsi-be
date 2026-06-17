@@ -85,4 +85,36 @@ class OrderController extends Controller
             ], 404);
         }
     }
+
+    public function checkVoucher(Request $request)
+    {
+        $validated = $request->validate([
+            'voucher_code' => ['required', 'string'],
+            'subtotal' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        try {
+            $result = $this->service->checkVoucherValidity(
+                $validated['voucher_code'],
+                (float) $validated['subtotal']
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Voucher valid.',
+                'data' => $result,
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first() ?? 'Voucher tidak valid.',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memvalidasi voucher.',
+            ], 422);
+        }
+    }
 }
