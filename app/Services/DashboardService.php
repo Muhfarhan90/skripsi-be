@@ -8,6 +8,7 @@ use App\Models\CourseOffering;
 use App\Models\Enrollment;
 use App\Models\ForumPost;
 use App\Models\ForumReply;
+use App\Models\Order;
 use App\Models\Review;
 use App\Models\Transaction;
 use App\Models\User;
@@ -22,57 +23,64 @@ class DashboardService
     ) {
     }
 
-    public function getAdminDashboard(): array
+    public function getAdminDashboard(?string $startDate = null, ?string $endDate = null): array
     {
         $actor = auth()->user();
         $roleName = strtolower((string) ($actor?->role?->name ?? ''));
 
+        // Parse dates using Carbon
+        $start = $startDate ? Carbon::parse($startDate)->startOfDay() : now()->subMonths(5)->startOfMonth();
+        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : now()->endOfDay();
+
+        // Calculate previous period for deltas
+        $daysDiff = $start->diffInDays($end) + 1;
+        $prevStart = $start->copy()->subDays($daysDiff);
+        $prevEnd = $start->copy()->subSecond();
+
         if ($actor && $roleName === 'instructor') {
             return [
                 'context' => 'instructor',
-                'metrics' => $this->buildInstructorMetrics((int) $actor->id),
+                'metrics' => $this->buildInstructorMetrics((int) $actor->id, $start, $end, $prevStart, $prevEnd),
                 'recent_activities' => [],
                 'instructor_overview' => $this->buildInstructorOverview((int) $actor->id),
+                'instructor_charts_data' => $this->buildMonthlyInstructorChartsData((int) $actor->id, $start, $end),
             ];
         }
 
         return [
             'context' => 'admin',
-            'metrics' => $this->buildAdminMetrics(),
+            'metrics' => $this->buildAdminMetrics($start, $end, $prevStart, $prevEnd),
             'recent_activities' => $this->buildRecentActivities(),
             'instructor_overview' => null,
+            'charts_data' => $this->buildMonthlyChartsData($start, $end),
         ];
     }
 
-    private function buildAdminMetrics(): array
+    private function buildAdminMetrics(Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
     {
         $now = now();
-        $currentMonthStart = $now->copy()->startOfMonth();
-        $currentMonthEnd = $now->copy()->endOfMonth();
-        $previousMonthStart = $currentMonthStart->copy()->subMonthNoOverflow()->startOfMonth();
-        $previousMonthEnd = $currentMonthStart->copy()->subSecond();
 
         $totalUsers = User::query()->count();
         $activeUsers = User::query()->where('is_active', true)->count();
-        $currentMonthUsers = User::query()
-            ->whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])
+        $currentPeriodUsers = User::query()
+            ->whereBetween('created_at', [$start, $end])
             ->count();
-        $previousMonthUsers = User::query()
-            ->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])
+        $previousPeriodUsers = User::query()
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
             ->count();
 
         $totalCourses = Course::query()->count();
         $activeOfferings = CourseOffering::query()->where('is_active', true)->count();
-        $currentMonthCourses = Course::query()
-            ->whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])
+        $currentPeriodCourses = Course::query()
+            ->whereBetween('created_at', [$start, $end])
             ->count();
-        $previousMonthCourses = Course::query()
-            ->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])
+        $previousPeriodCourses = Course::query()
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
             ->count();
 
-        $successfulTransactionsThisMonth = $this->successfulTransactionsInPeriod($currentMonthStart, $currentMonthEnd);
-        $successfulTransactionsPrevMonth = $this->successfulTransactionsInPeriod($previousMonthStart, $previousMonthEnd);
-        $successfulRevenueThisMonth = $this->successfulRevenueInPeriod($currentMonthStart, $currentMonthEnd);
+        $successfulTransactionsThisMonth = $this->successfulTransactionsInPeriod($start, $end);
+        $successfulTransactionsPrevMonth = $this->successfulTransactionsInPeriod($prevStart, $prevEnd);
+        $successfulRevenueThisMonth = $this->successfulRevenueInPeriod($start, $end);
 
         $activeVouchers = Voucher::query()
             ->where('is_active', true)
@@ -83,10 +91,10 @@ class DashboardService
             ->count();
         $previousActiveVouchers = Voucher::query()
             ->where('is_active', true)
-            ->where('created_at', '<=', $previousMonthEnd)
-            ->where(function (Builder $query) use ($previousMonthEnd) {
+            ->where('created_at', '<=', $prevEnd)
+            ->where(function (Builder $query) use ($prevEnd) {
                 $query->whereNull('expired_at')
-                    ->orWhere('expired_at', '>=', $previousMonthEnd);
+                    ->orWhere('expired_at', '>=', $prevEnd);
             })
             ->count();
         $expiringSoonVouchers = Voucher::query()
@@ -102,18 +110,18 @@ class DashboardService
                 'note' => $activeUsers > 0
                     ? "{$this->formatInteger($activeUsers)} akun aktif saat ini"
                     : 'Belum ada akun aktif',
-            ], $this->buildTrend($currentMonthUsers, $previousMonthUsers)),
+            ], $this->buildTrend($currentPeriodUsers, $previousPeriodUsers)),
             array_merge([
                 'label' => 'Total Courses',
                 'value' => $this->formatInteger($totalCourses),
                 'note' => $activeOfferings > 0
                     ? "{$this->formatInteger($activeOfferings)} offering aktif saat ini"
                     : 'Belum ada offering aktif',
-            ], $this->buildTrend($currentMonthCourses, $previousMonthCourses)),
+            ], $this->buildTrend($currentPeriodCourses, $previousPeriodCourses)),
             array_merge([
-                'label' => 'Transaksi Bulan Ini',
+                'label' => 'Transaksi Periode Ini',
                 'value' => $this->formatInteger($successfulTransactionsThisMonth),
-                'note' => "{$this->formatCurrency($successfulRevenueThisMonth)} transaksi sukses bulan ini",
+                'note' => "{$this->formatCurrency($successfulRevenueThisMonth)} transaksi sukses periode ini",
             ], $this->buildTrend($successfulTransactionsThisMonth, $successfulTransactionsPrevMonth)),
             array_merge([
                 'label' => 'Voucher Aktif',
@@ -130,24 +138,20 @@ class DashboardService
         return $this->activityLogService->getRecentAdminActivities($limit);
     }
 
-    private function buildInstructorMetrics(int $instructorId): array
+    private function buildInstructorMetrics(int $instructorId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
     {
         $now = now();
-        $currentMonthStart = $now->copy()->startOfMonth();
-        $currentMonthEnd = $now->copy()->endOfMonth();
-        $previousMonthStart = $currentMonthStart->copy()->subMonthNoOverflow()->startOfMonth();
-        $previousMonthEnd = $currentMonthStart->copy()->subSecond();
 
         $totalCourses = Course::query()
             ->where('instructor_id', $instructorId)
             ->count();
-        $currentMonthCourses = Course::query()
+        $currentPeriodCourses = Course::query()
             ->where('instructor_id', $instructorId)
-            ->whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])
+            ->whereBetween('created_at', [$start, $end])
             ->count();
-        $previousMonthCourses = Course::query()
+        $previousPeriodCourses = Course::query()
             ->where('instructor_id', $instructorId)
-            ->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
             ->count();
 
         $activeOfferings = CourseOffering::query()
@@ -156,16 +160,16 @@ class DashboardService
                 $query->where('instructor_id', $instructorId);
             })
             ->count();
-        $currentMonthOfferings = CourseOffering::query()
+        $currentPeriodOfferings = CourseOffering::query()
             ->where('is_active', true)
-            ->whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])
+            ->whereBetween('created_at', [$start, $end])
             ->whereHas('course', function (Builder $query) use ($instructorId) {
                 $query->where('instructor_id', $instructorId);
             })
             ->count();
-        $previousMonthOfferings = CourseOffering::query()
+        $previousPeriodOfferings = CourseOffering::query()
             ->where('is_active', true)
-            ->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
             ->whereHas('course', function (Builder $query) use ($instructorId) {
                 $query->where('instructor_id', $instructorId);
             })
@@ -178,14 +182,14 @@ class DashboardService
             })
             ->distinct('user_id')
             ->count('user_id');
-        $currentMonthEnrollments = Enrollment::query()
-            ->whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])
+        $currentPeriodEnrollments = Enrollment::query()
+            ->whereBetween('created_at', [$start, $end])
             ->whereHas('courseOffering.course', function (Builder $query) use ($instructorId) {
                 $query->where('instructor_id', $instructorId);
             })
             ->count();
-        $previousMonthEnrollments = Enrollment::query()
-            ->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])
+        $previousPeriodEnrollments = Enrollment::query()
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
             ->whereHas('courseOffering.course', function (Builder $query) use ($instructorId) {
                 $query->where('instructor_id', $instructorId);
             })
@@ -197,16 +201,16 @@ class DashboardService
                 $query->where('instructor_id', $instructorId);
             })
             ->count();
-        $currentMonthPendingReviews = AssignmentSubmission::query()
+        $currentPeriodPendingReviews = AssignmentSubmission::query()
             ->where('status', 'submitted')
-            ->whereBetween('created_at', [$currentMonthStart, $currentMonthEnd])
+            ->whereBetween('created_at', [$start, $end])
             ->whereHas('assignment.course', function (Builder $query) use ($instructorId) {
                 $query->where('instructor_id', $instructorId);
             })
             ->count();
-        $previousMonthPendingReviews = AssignmentSubmission::query()
+        $previousPeriodPendingReviews = AssignmentSubmission::query()
             ->where('status', 'submitted')
-            ->whereBetween('created_at', [$previousMonthStart, $previousMonthEnd])
+            ->whereBetween('created_at', [$prevStart, $prevEnd])
             ->whereHas('assignment.course', function (Builder $query) use ($instructorId) {
                 $query->where('instructor_id', $instructorId);
             })
@@ -219,29 +223,181 @@ class DashboardService
                 'note' => $activeOfferings > 0
                     ? "{$this->formatInteger($activeOfferings)} offering aktif sedang berjalan"
                     : 'Belum ada offering aktif',
-            ], $this->buildTrend($currentMonthCourses, $previousMonthCourses)),
+            ], $this->buildTrend($currentPeriodCourses, $previousPeriodCourses)),
             array_merge([
                 'label' => 'Offering Aktif',
                 'value' => $this->formatInteger($activeOfferings),
-                'note' => $currentMonthOfferings > 0
-                    ? "{$this->formatInteger($currentMonthOfferings)} offering aktif dibuat bulan ini"
-                    : 'Belum ada offering aktif baru bulan ini',
-            ], $this->buildTrend($currentMonthOfferings, $previousMonthOfferings)),
+                'note' => $currentPeriodOfferings > 0
+                    ? "{$this->formatInteger($currentPeriodOfferings)} offering aktif dibuat periode ini"
+                    : 'Belum ada offering aktif baru periode ini',
+            ], $this->buildTrend($currentPeriodOfferings, $previousPeriodOfferings)),
             array_merge([
                 'label' => 'Siswa Aktif',
                 'value' => $this->formatInteger($activeStudents),
-                'note' => $currentMonthEnrollments > 0
-                    ? "{$this->formatInteger($currentMonthEnrollments)} enrollment baru bulan ini"
-                    : 'Belum ada enrollment baru bulan ini',
-            ], $this->buildTrend($currentMonthEnrollments, $previousMonthEnrollments)),
+                'note' => $currentPeriodEnrollments > 0
+                    ? "{$this->formatInteger($currentPeriodEnrollments)} enrollment baru periode ini"
+                    : 'Belum ada enrollment baru periode ini',
+            ], $this->buildTrend($currentPeriodEnrollments, $previousPeriodEnrollments)),
             array_merge([
                 'label' => 'Review Submission',
                 'value' => $this->formatInteger($pendingAssignmentReviews),
                 'note' => $pendingAssignmentReviews > 0
                     ? 'Submission assignment menunggu ditinjau'
                     : 'Tidak ada submission yang menunggu review',
-            ], $this->buildTrend($currentMonthPendingReviews, $previousMonthPendingReviews)),
+            ], $this->buildTrend($currentPeriodPendingReviews, $previousPeriodPendingReviews)),
         ];
+    }
+
+    private function buildMonthlyChartsData(Carbon $start, Carbon $end): array
+    {
+        $data = [];
+        $studentRoleId = \App\Models\Role::where('name', 'user')->value('id');
+
+        $diffInDays = $start->diffInDays($end);
+
+        if ($diffInDays <= 31) {
+            // Group by Day
+            $current = $start->copy();
+            while ($current->lte($end)) {
+                $dayStart = $current->copy()->startOfDay();
+                $dayEnd = $current->copy()->endOfDay();
+
+                $studentsCount = User::query()
+                    ->where('role_id', $studentRoleId)
+                    ->whereBetween('created_at', [$dayStart, $dayEnd])
+                    ->count();
+
+                $ordersCount = Order::query()
+                    ->whereBetween('created_at', [$dayStart, $dayEnd])
+                    ->count();
+
+                $revenue = (float) $this->successfulRevenueInPeriod($dayStart, $dayEnd);
+                $transactionsCount = $this->successfulTransactionsInPeriod($dayStart, $dayEnd);
+
+                $data[] = [
+                    'label' => $current->format('d M'),
+                    'students' => $studentsCount,
+                    'orders' => $ordersCount,
+                    'transactions' => $transactionsCount,
+                    'revenue' => $revenue,
+                ];
+
+                $current->addDay();
+            }
+        } else {
+            // Group by Month
+            $current = $start->copy()->startOfMonth();
+            while ($current->lte($end)) {
+                $monthStart = $current->copy()->startOfMonth();
+                if ($monthStart->lt($start)) {
+                    $monthStart = $start->copy();
+                }
+
+                $monthEnd = $current->copy()->endOfMonth();
+                if ($monthEnd->gt($end)) {
+                    $monthEnd = $end->copy();
+                }
+
+                $studentsCount = User::query()
+                    ->where('role_id', $studentRoleId)
+                    ->whereBetween('created_at', [$monthStart, $monthEnd])
+                    ->count();
+
+                $ordersCount = Order::query()
+                    ->whereBetween('created_at', [$monthStart, $monthEnd])
+                    ->count();
+
+                $revenue = (float) $this->successfulRevenueInPeriod($monthStart, $monthEnd);
+                $transactionsCount = $this->successfulTransactionsInPeriod($monthStart, $monthEnd);
+
+                $data[] = [
+                    'label' => $current->format('M Y'),
+                    'students' => $studentsCount,
+                    'orders' => $ordersCount,
+                    'transactions' => $transactionsCount,
+                    'revenue' => $revenue,
+                ];
+
+                $current->addMonth();
+            }
+        }
+
+        return $data;
+    }
+
+    private function buildMonthlyInstructorChartsData(int $instructorId, Carbon $start, Carbon $end): array
+    {
+        $data = [];
+        $diffInDays = $start->diffInDays($end);
+
+        if ($diffInDays <= 31) {
+            // Group by Day
+            $current = $start->copy();
+            while ($current->lte($end)) {
+                $dayStart = $current->copy()->startOfDay();
+                $dayEnd = $current->copy()->endOfDay();
+
+                $enrollmentsCount = Enrollment::query()
+                    ->whereBetween('created_at', [$dayStart, $dayEnd])
+                    ->whereHas('courseOffering.course', function (Builder $query) use ($instructorId) {
+                        $query->where('instructor_id', $instructorId);
+                    })
+                    ->count();
+
+                $forumPostsCount = ForumPost::query()
+                    ->whereBetween('created_at', [$dayStart, $dayEnd])
+                    ->whereHas('course', function (Builder $query) use ($instructorId) {
+                        $query->where('instructor_id', $instructorId);
+                    })
+                    ->count();
+
+                $data[] = [
+                    'label' => $current->format('d M'),
+                    'enrollments' => $enrollmentsCount,
+                    'forum_posts' => $forumPostsCount,
+                ];
+
+                $current->addDay();
+            }
+        } else {
+            // Group by Month
+            $current = $start->copy()->startOfMonth();
+            while ($current->lte($end)) {
+                $monthStart = $current->copy()->startOfMonth();
+                if ($monthStart->lt($start)) {
+                    $monthStart = $start->copy();
+                }
+
+                $monthEnd = $current->copy()->endOfMonth();
+                if ($monthEnd->gt($end)) {
+                    $monthEnd = $end->copy();
+                }
+
+                $enrollmentsCount = Enrollment::query()
+                    ->whereBetween('created_at', [$monthStart, $monthEnd])
+                    ->whereHas('courseOffering.course', function (Builder $query) use ($instructorId) {
+                        $query->where('instructor_id', $instructorId);
+                    })
+                    ->count();
+
+                $forumPostsCount = ForumPost::query()
+                    ->whereBetween('created_at', [$monthStart, $monthEnd])
+                    ->whereHas('course', function (Builder $query) use ($instructorId) {
+                        $query->where('instructor_id', $instructorId);
+                    })
+                    ->count();
+
+                $data[] = [
+                    'label' => $current->format('M Y'),
+                    'enrollments' => $enrollmentsCount,
+                    'forum_posts' => $forumPostsCount,
+                ];
+
+                $current->addMonth();
+            }
+        }
+
+        return $data;
     }
 
     private function buildInstructorOverview(int $instructorId): array
