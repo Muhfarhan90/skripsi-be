@@ -22,10 +22,12 @@ class WebsiteSection extends Model
         'secondary_cta_label',
         'secondary_cta_url',
         'is_active',
+        'hero_images',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'hero_images' => 'array',
     ];
 
     public function items(): HasMany

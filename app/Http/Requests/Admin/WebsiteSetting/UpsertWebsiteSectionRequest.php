@@ -34,6 +34,8 @@ class UpsertWebsiteSectionRequest extends FormRequest
             'secondary_cta_label' => ['nullable', 'string', 'max:120'],
             'secondary_cta_url' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
+            'hero_images' => ['nullable', 'array'],
+            'hero_images.*' => ['required', 'string', 'max:255'],
             'items' => ['nullable', 'array', 'max:20'],
             'items.*.title' => ['nullable', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string', 'max:2000'],

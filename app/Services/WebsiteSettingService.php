@@ -73,6 +73,7 @@ class WebsiteSettingService
             'hero_highlight' => $hero?->subtitle ?? '',
             'hero_description' => $hero?->body ?? '',
             'hero_image_url' => $hero?->image_url,
+            'hero_images' => $hero?->hero_images ?? [],
             'hero_primary_cta_label' => $hero?->cta_label ?? '',
             'hero_primary_cta_url' => $hero?->cta_url ?? '/register',
             'hero_secondary_cta_label' => $hero?->secondary_cta_label ?? '',

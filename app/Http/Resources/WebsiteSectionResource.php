@@ -22,6 +22,7 @@ class WebsiteSectionResource extends JsonResource
             'secondary_cta_label' => $this->secondary_cta_label,
             'secondary_cta_url' => $this->secondary_cta_url,
             'is_active' => $this->is_active,
+            'hero_images' => $this->hero_images,
             'items' => WebsiteSectionItemResource::collection($this->whenLoaded('items')),
             'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
