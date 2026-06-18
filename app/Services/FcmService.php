@@ -104,6 +104,10 @@ class FcmService
      */
     private function buildMessagePayload(Notification $notification, UserDevice $device): array
     {
+        $baseUrl = rtrim((string) (config('app.frontend_url') ?: config('app.url')), '/');
+        $iconUrl = $baseUrl . '/app-icon-192.png';
+        $badgeUrl = $baseUrl . '/app-icon-maskable-192.png';
+
         $webpushConfig = [
             'headers' => [
                 'Urgency' => 'high',
@@ -111,8 +115,8 @@ class FcmService
             'notification' => [
                 'title' => $notification->title,
                 'body' => $notification->body,
-                'icon' => '/globe.svg',
-                'badge' => '/globe.svg',
+                'icon' => $iconUrl,
+                'badge' => $badgeUrl,
                 'tag' => sprintf('notification-%s', $notification->id),
                 'renotify' => false,
             ],
