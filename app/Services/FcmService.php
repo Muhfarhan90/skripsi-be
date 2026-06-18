@@ -18,16 +18,21 @@ class FcmService
 
     public function sendNotification(Notification $notification): void
     {
+        Log::info('FCM: Memulai sendNotification untuk Notification ID: ' . $notification->id);
+
         if (! $this->accessTokenService->isConfigured()) {
+            Log::warning('FCM: Gagal mengirim karena FirebaseAccessTokenService belum terkonfigurasi (isConfigured = false).');
             return;
         }
 
         $projectId = $this->accessTokenService->getProjectId();
         if (! $projectId) {
-            Log::warning('Skipping FCM push because FIREBASE_PROJECT_ID is not configured.');
+            Log::warning('FCM: Skipping FCM push karena FIREBASE_PROJECT_ID kosong.');
 
             return;
         }
+
+        Log::info('FCM: Mencari device untuk User ID: ' . $notification->user_id);
 
         $devices = UserDevice::query()
             ->where('user_id', $notification->user_id)
@@ -35,6 +40,7 @@ class FcmService
             ->get();
 
         if ($devices->isEmpty()) {
+            Log::warning('FCM: Tidak ada device aktif ditemukan untuk User ID: ' . $notification->user_id);
             return;
         }
 
