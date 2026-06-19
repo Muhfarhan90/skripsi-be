@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Question;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Quiz;
 use Illuminate\Database\Seeder;
 
 class QuestionSeeder extends Seeder
@@ -13,29 +13,56 @@ class QuestionSeeder extends Seeder
      */
     public function run(): void
     {
+        $quiz = Quiz::query()
+            ->where('title', 'Kuis Pemrograman Web Dasar')
+            ->whereHas('course', function ($query) {
+                $query->where('slug', 'pemrograman-web');
+            })
+            ->first();
+
+        if (! $quiz) {
+            return;
+        }
+
         $questions = [
             [
-                'quiz_id' => 1,
-                'question_text' => 'What is the capital of France?',
+                'quiz_id' => $quiz->id,
+                'question_text' => 'Tag HTML apa yang digunakan untuk membuat tautan ke halaman lain?',
                 'type' => 'multiple_choice',
-                'score' => 10,
+                'score' => 20,
                 'sort_order' => 1,
                 'is_active' => true,
             ],
             [
-                'quiz_id' => 1,
-                'question_text' => 'The sky is blue. True or False?',
-                'type' => 'true_false',
-                'score' => 5,
+                'quiz_id' => $quiz->id,
+                'question_text' => 'Properti CSS apa yang umum digunakan untuk mengatur warna teks?',
+                'type' => 'multiple_choice',
+                'score' => 20,
                 'sort_order' => 2,
                 'is_active' => true,
             ],
             [
-                'quiz_id' => 2,
-                'question_text' => 'What is the largest planet in our solar system?',
+                'quiz_id' => $quiz->id,
+                'question_text' => 'JavaScript berjalan di browser untuk membuat halaman web lebih interaktif.',
+                'type' => 'true_false',
+                'score' => 20,
+                'sort_order' => 3,
+                'is_active' => true,
+            ],
+            [
+                'quiz_id' => $quiz->id,
+                'question_text' => 'Metode HTTP apa yang biasanya digunakan untuk mengambil data dari server?',
                 'type' => 'multiple_choice',
-                'score' => 10,
-                'sort_order' => 1,
+                'score' => 20,
+                'sort_order' => 4,
+                'is_active' => true,
+            ],
+            [
+                'quiz_id' => $quiz->id,
+                'question_text' => 'Responsive design bertujuan agar tampilan web menyesuaikan berbagai ukuran layar.',
+                'type' => 'true_false',
+                'score' => 20,
+                'sort_order' => 5,
                 'is_active' => true,
             ],
         ];

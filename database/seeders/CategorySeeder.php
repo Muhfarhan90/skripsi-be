@@ -14,19 +14,19 @@ class CategorySeeder extends Seeder
     {
         $categories = [
             [
-                'name' => 'Technology',
-                'slug' => 'technology',
-                'description' => 'All about the latest in technology.',
+                'name' => 'Ilmu Komputer',
+                'slug' => 'ilmu-komputer',
+                'description' => 'Kursus seputar pemrograman, pengembangan web, dan dasar teknologi informasi.',
             ],
             [
-                'name' => 'Health',
-                'slug' => 'health',
-                'description' => 'Tips and news about health and wellness.',
+                'name' => 'Kedokteran',
+                'slug' => 'kedokteran',
+                'description' => 'Kursus pengantar untuk memahami konsep dasar kedokteran dan kesehatan klinis.',
             ],
             [
-                'name' => 'Travel',
-                'slug' => 'travel',
-                'description' => 'Guides and stories from around the world.',
+                'name' => 'Pertanian',
+                'slug' => 'pertanian',
+                'description' => 'Kursus tentang budidaya, teknologi pertanian, dan pengelolaan lahan produktif.',
             ],
         ];
 

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
+use App\Models\Course;
 use App\Models\Enrollment;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -16,26 +17,29 @@ class AssignmentSubmissionSeeder extends Seeder
     public function run(): void
     {
         $students = User::query()->pluck('id', 'email');
-        $instructorId = User::where('email', 'instructor@example.com')->value('id');
+        $instructorId = Course::query()
+            ->where('slug', 'pemrograman-web')
+            ->value('instructor_id')
+            ?? User::where('email', 'instructor@example.com')->value('id');
 
         $activeEnrollment = $this->findEnrollmentByStudentAndOffering(
             (int) $students->get('student@example.com'),
-            'introduction-to-programming',
+            'pemrograman-web',
             'PRE-U-2026-A'
         );
         $completedEnrollment = $this->findEnrollmentByStudentAndOffering(
             (int) $students->get('student.completed@example.com'),
-            'introduction-to-programming',
+            'pemrograman-web',
             'PRE-U-2025-B'
         );
 
         $activeAssignment = $this->findAssignmentByCourseAndTitle(
-            'introduction-to-programming',
-            'UAS Pemrograman Dasar'
+            'pemrograman-web',
+            'Tugas Project Pemrograman Web'
         );
         $completedAssignment = $this->findAssignmentByCourseAndTitle(
-            'introduction-to-programming',
-            'UAS Pemrograman Dasar'
+            'pemrograman-web',
+            'Tugas Project Pemrograman Web'
         );
 
         if ($activeEnrollment && $activeAssignment) {
@@ -47,8 +51,8 @@ class AssignmentSubmissionSeeder extends Seeder
                 ],
                 [
                     'user_id' => $activeEnrollment->user_id,
-                    'submission_text' => 'Draft project CLI untuk validasi awal.',
-                    'attachment_url' => 'https://example.com/submissions/uas-active-v1.zip',
+                    'submission_text' => 'Draft halaman web responsif untuk validasi awal.',
+                    'attachment_url' => 'https://example.com/submissions/web-project-active-v1.zip',
                     'status' => 'submitted',
                     'review_notes' => null,
                     'reviewed_by' => null,
@@ -67,8 +71,8 @@ class AssignmentSubmissionSeeder extends Seeder
                 ],
                 [
                     'user_id' => $completedEnrollment->user_id,
-                    'submission_text' => 'Final project lengkap sesuai rubric.',
-                    'attachment_url' => 'https://example.com/submissions/uas-completed-v1.zip',
+                    'submission_text' => 'Final project halaman web lengkap sesuai rubric.',
+                    'attachment_url' => 'https://example.com/submissions/web-project-completed-v1.zip',
                     'status' => 'approved',
                     'review_notes' => 'Project approved.',
                     'reviewed_by' => $instructorId,

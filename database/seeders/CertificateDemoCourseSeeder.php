@@ -57,10 +57,13 @@ class CertificateDemoCourseSeeder extends Seeder
             ]
         );
 
-        $categoryId = Category::query()->where('slug', 'technology')->value('id')
+        $categoryId = Category::query()->where('slug', 'ilmu-komputer')->value('id')
             ?? Category::updateOrCreate(
-                ['slug' => 'technology'],
-                ['name' => 'Technology']
+                ['slug' => 'ilmu-komputer'],
+                [
+                    'name' => 'Ilmu Komputer',
+                    'description' => 'Kursus seputar pemrograman, pengembangan web, dan dasar teknologi informasi.',
+                ]
             )->id;
 
         $course = Course::updateOrCreate(

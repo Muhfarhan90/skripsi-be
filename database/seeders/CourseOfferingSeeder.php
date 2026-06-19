@@ -19,7 +19,7 @@ class CourseOfferingSeeder extends Seeder
 
         $offerings = [
             [
-                'course_slug' => 'introduction-to-programming',
+                'course_slug' => 'pemrograman-web',
                 'period_code' => 'PRE-U-2026-A',
                 'capacity' => 120,
                 'price' => 500000,
@@ -27,7 +27,7 @@ class CourseOfferingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'course_slug' => 'advanced-web-development',
+                'course_slug' => 'dasar-kedokteran-klinis',
                 'period_code' => 'PRE-U-2026-A',
                 'capacity' => 80,
                 'price' => 750000,
@@ -35,7 +35,7 @@ class CourseOfferingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'course_slug' => 'health-and-wellness',
+                'course_slug' => 'teknologi-pertanian-modern',
                 'period_code' => 'PRE-U-2025-B',
                 'capacity' => 60,
                 'price' => 350000,
@@ -43,7 +43,7 @@ class CourseOfferingSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'course_slug' => 'introduction-to-programming',
+                'course_slug' => 'pemrograman-web',
                 'period_code' => 'PRE-U-2025-B',
                 'capacity' => 100,
                 'price' => 500000,

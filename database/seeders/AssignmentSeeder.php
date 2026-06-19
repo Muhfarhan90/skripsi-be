@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Assignment;
 use App\Models\Course;
+use App\Models\Section;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class AssignmentSeeder extends Seeder
@@ -13,28 +15,43 @@ class AssignmentSeeder extends Seeder
      */
     public function run(): void
     {
-        $courseBySlug = Course::query()->pluck('id', 'slug');
+        $courses = Course::query()
+            ->get(['id', 'slug', 'instructor_id'])
+            ->keyBy('slug');
+        $fallbackCreatorId = User::where('email', 'instructor@example.com')->value('id')
+            ?? User::where('email', 'admin@example.com')->value('id');
         $now = now();
 
         $rows = [
             [
-                'course_slug' => 'introduction-to-programming',
-                'title' => 'UAS Pemrograman Dasar',
-                'description' => 'Final project untuk menguji pemahaman fundamental pemrograman.',
-                'instructions' => 'Buat mini project CLI sederhana dan jelaskan struktur kode.',
+                'course_slug' => 'pemrograman-web',
+                'title' => 'Tugas Project Pemrograman Web',
+                'description' => 'Project sederhana untuk menguji pemahaman dasar pembuatan halaman web.',
+                'instructions' => 'Buat satu halaman web responsif berisi profil produk atau layanan. Sertakan HTML, CSS, dan JavaScript sederhana jika diperlukan.',
                 'due_at' => $now->copy()->addDays(30),
                 'is_required_for_certificate' => true,
                 'allow_resubmission' => true,
-                'max_attempts' => 5,
+                'max_attempts' => 3,
                 'status' => 'published',
             ],
             [
-                'course_slug' => 'advanced-web-development',
-                'title' => 'Project Optional: Landing Page',
-                'description' => 'Project opsional untuk pengayaan portofolio.',
-                'instructions' => 'Bangun landing page responsif dengan dokumentasi singkat.',
-                'due_at' => $now->copy()->addDays(80),
-                'is_required_for_certificate' => false,
+                'course_slug' => 'dasar-kedokteran-klinis',
+                'title' => 'Tugas Studi Kasus Anamnesis',
+                'description' => 'Latihan memahami alur anamnesis awal melalui studi kasus sederhana.',
+                'instructions' => 'Baca skenario pasien, lalu tuliskan pertanyaan anamnesis utama, dugaan awal, dan edukasi keselamatan pasien secara ringkas.',
+                'due_at' => $now->copy()->addDays(21),
+                'is_required_for_certificate' => true,
+                'allow_resubmission' => true,
+                'max_attempts' => 3,
+                'status' => 'published',
+            ],
+            [
+                'course_slug' => 'teknologi-pertanian-modern',
+                'title' => 'Tugas Rencana Budidaya Modern',
+                'description' => 'Latihan menyusun rencana budidaya sederhana dengan pendekatan teknologi dan pemantauan data.',
+                'instructions' => 'Pilih satu komoditas, lalu susun rencana budidaya, kebutuhan monitoring, dan indikator keberhasilan panen.',
+                'due_at' => $now->copy()->addDays(25),
+                'is_required_for_certificate' => true,
                 'allow_resubmission' => true,
                 'max_attempts' => 3,
                 'status' => 'published',
@@ -42,18 +59,26 @@ class AssignmentSeeder extends Seeder
         ];
 
         foreach ($rows as $row) {
-            $courseId = $courseBySlug->get($row['course_slug']);
-            if (! $courseId) {
+            $course = $courses->get($row['course_slug']);
+
+            if (! $course) {
                 continue;
             }
 
+            $sectionId = Section::query()
+                ->where('course_id', $course->id)
+                ->where('title', 'Evaluasi dan Tugas')
+                ->value('id');
+
             Assignment::updateOrCreate(
                 [
-                    'course_id' => $courseId,
+                    'course_id' => $course->id,
                     'title' => $row['title'],
                 ],
                 [
-                    'course_id' => $courseId,
+                    'course_id' => $course->id,
+                    'section_id' => $sectionId,
+                    'created_by' => $course->instructor_id ?: $fallbackCreatorId,
                     'title' => $row['title'],
                     'description' => $row['description'],
                     'instructions' => $row['instructions'],

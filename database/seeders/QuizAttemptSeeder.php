@@ -23,7 +23,7 @@ class QuizAttemptSeeder extends Seeder
             ->whereHas('courseOffering', function ($query) {
                 $query
                     ->whereHas('course', function ($courseQuery) {
-                        $courseQuery->where('slug', 'introduction-to-programming');
+                        $courseQuery->where('slug', 'pemrograman-web');
                     })
                     ->whereHas('academicPeriod', function ($periodQuery) {
                         $periodQuery->where('code', 'PRE-U-2026-A');
@@ -36,7 +36,7 @@ class QuizAttemptSeeder extends Seeder
             ->whereHas('courseOffering', function ($query) {
                 $query
                     ->whereHas('course', function ($courseQuery) {
-                        $courseQuery->where('slug', 'introduction-to-programming');
+                        $courseQuery->where('slug', 'pemrograman-web');
                     })
                     ->whereHas('academicPeriod', function ($periodQuery) {
                         $periodQuery->where('code', 'PRE-U-2025-B');
@@ -44,21 +44,25 @@ class QuizAttemptSeeder extends Seeder
             })
             ->value('id');
 
-        $quiz1Id = Quiz::where('title', 'Quiz 1: Basics of Programming')->value('id');
-        $quiz2Id = Quiz::where('title', 'Quiz 2: Control Structures')->value('id');
+        $quizId = Quiz::query()
+            ->where('title', 'Kuis Pemrograman Web Dasar')
+            ->whereHas('course', function ($query) {
+                $query->where('slug', 'pemrograman-web');
+            })
+            ->value('id');
 
         $attempts = [
             [
                 'enrollment_id' => $activeEnrollmentId,
-                'quiz_id' => $quiz1Id,
-                'total_score' => 15,
+                'quiz_id' => $quizId,
+                'total_score' => 100,
                 'status' => 'graded',
                 'started_at' => now()->subDays(6)->setTime(8, 0),
-                'submitted_at' => now()->subDays(6)->setTime(8, 10),
+                'submitted_at' => now()->subDays(6)->setTime(8, 12),
             ],
             [
                 'enrollment_id' => $activeEnrollmentId,
-                'quiz_id' => $quiz1Id,
+                'quiz_id' => $quizId,
                 'total_score' => 0,
                 'status' => 'in_progress',
                 'started_at' => now()->subDays(2)->setTime(10, 0),
@@ -66,11 +70,11 @@ class QuizAttemptSeeder extends Seeder
             ],
             [
                 'enrollment_id' => $completedEnrollmentId,
-                'quiz_id' => $quiz2Id,
-                'total_score' => 10,
+                'quiz_id' => $quizId,
+                'total_score' => 100,
                 'status' => 'graded',
                 'started_at' => now()->subDays(102)->setTime(11, 0),
-                'submitted_at' => now()->subDays(102)->setTime(11, 9),
+                'submitted_at' => now()->subDays(102)->setTime(11, 12),
             ],
         ];
 
@@ -83,7 +87,7 @@ class QuizAttemptSeeder extends Seeder
                 [
                     'enrollment_id' => $attempt['enrollment_id'],
                     'quiz_id' => $attempt['quiz_id'],
-                    'started_at' => $attempt['started_at'],
+                    'status' => $attempt['status'],
                 ],
                 $attempt
             );

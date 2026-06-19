@@ -32,10 +32,44 @@ class UserSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'instructor@example.com'],
             [
-                'fullname' => 'Instructor User',
+                'fullname' => 'Lead Instructor',
                 'password' => bcrypt('password'),
                 'email_verified_at' => now(),
                 'role_id' => $instructorRoleId,
+                'bio' => 'Instruktur umum untuk kebutuhan demo dan fallback seed data.',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'web.instructor@example.com'],
+            [
+                'fullname' => 'Aditya Pratama',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'role_id' => $instructorRoleId,
+                'bio' => 'Mengampu course Pemrograman Web dengan fokus pada HTML, CSS, JavaScript, dan fondasi pengembangan aplikasi web.',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'medical.instructor@example.com'],
+            [
+                'fullname' => 'dr. Nabila Putri',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'role_id' => $instructorRoleId,
+                'bio' => 'Mengampu course Dasar Kedokteran Klinis dengan fokus pada anamnesis, pemeriksaan awal, dan komunikasi pasien.',
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'agri.instructor@example.com'],
+            [
+                'fullname' => 'Bima Saputra',
+                'password' => bcrypt('password'),
+                'email_verified_at' => now(),
+                'role_id' => $instructorRoleId,
+                'bio' => 'Mengampu course Teknologi Pertanian Modern dengan fokus pada budidaya berbasis data dan teknologi pertanian terapan.',
             ]
         );
 

@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Course;
 use App\Models\Quiz;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Section;
 use Illuminate\Database\Seeder;
 
 class QuizSeeder extends Seeder
@@ -13,47 +14,46 @@ class QuizSeeder extends Seeder
      */
     public function run(): void
     {
+        $course = Course::query()->where('slug', 'pemrograman-web')->first();
+        if (! $course) {
+            return;
+        }
+
+        $section = Section::query()
+            ->where('course_id', $course->id)
+            ->where('title', 'Evaluasi dan Tugas')
+            ->first();
+
+        if (! $section) {
+            return;
+        }
+
         $quizzes = [
             [
-                'course_id' => 1,
-                'section_id' => 1,
-                'title' => 'Quiz 1: Basics of Programming',
-                'description' => 'Test your understanding of basic programming concepts.',
-                'duration' => 600, // 10 minutes
+                'course_id' => $course->id,
+                'section_id' => $section->id,
+                'title' => 'Kuis Pemrograman Web Dasar',
+                'description' => 'Kuis singkat untuk menguji pemahaman dasar HTML, CSS, JavaScript, dan alur web.',
+                'duration' => 900,
                 'passing_score' => 70,
-                'weight' => 10,
-                'is_active' => true,
-                'is_random' => false,
-                'max_attempts' => 3,
-            ],
-            [
-                'course_id' => 1,
-                'section_id' => 2,
-                'title' => 'Quiz 2: Control Structures',
-                'description' => 'Assess your knowledge of control structures in programming.',
-                'duration' => 900, // 15 minutes
-                'passing_score' => 75,
-                'weight' => 15,
-                'is_active' => true,
-                'is_random' => false,
-                'max_attempts' => 3,
-            ],
-            [
-                'course_id' => 2,
-                'section_id' => 3,
-                'title' => 'Quiz: Advanced Web Development',
-                'description' => 'Evaluate your skills in advanced web development techniques.',
-                'duration' => 1200, // 20 minutes
-                'passing_score' => 80,
                 'weight' => 20,
                 'is_active' => true,
                 'is_random' => false,
                 'max_attempts' => 3,
+                'open_at' => null,
+                'close_at' => null,
             ],
         ];
 
         foreach ($quizzes as $quiz) {
-            Quiz::updateOrCreate($quiz);
+            Quiz::updateOrCreate(
+                [
+                    'course_id' => $quiz['course_id'],
+                    'section_id' => $quiz['section_id'],
+                    'title' => $quiz['title'],
+                ],
+                $quiz
+            );
         }
     }
 }

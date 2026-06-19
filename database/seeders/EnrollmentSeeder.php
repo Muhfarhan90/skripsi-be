@@ -29,18 +29,18 @@ class EnrollmentSeeder extends Seeder
         $enrollments = [
             [
                 'student_email' => 'student@example.com',
-                'course_slug' => 'introduction-to-programming',
+                'course_slug' => 'pemrograman-web',
                 'period_code' => 'PRE-U-2026-A',
                 'order_code' => 'ORD-20260509-ACTIVE',
                 'status' => 'active',
-                'progress' => 33,
+                'progress' => 0,
                 'started_at' => now()->subDays(20),
                 'ended_at' => now()->addDays(50),
                 'completed_at' => null,
             ],
             [
                 'student_email' => 'student.waiting@example.com',
-                'course_slug' => 'advanced-web-development',
+                'course_slug' => 'dasar-kedokteran-klinis',
                 'period_code' => 'PRE-U-2026-A',
                 'order_code' => 'ORD-20260509-WAITING',
                 'status' => 'pending',
@@ -51,7 +51,7 @@ class EnrollmentSeeder extends Seeder
             ],
             [
                 'student_email' => 'student.expired@example.com',
-                'course_slug' => 'health-and-wellness',
+                'course_slug' => 'teknologi-pertanian-modern',
                 'period_code' => 'PRE-U-2025-B',
                 'order_code' => 'ORD-20260509-EXPIRED',
                 'status' => 'expired',
@@ -62,7 +62,7 @@ class EnrollmentSeeder extends Seeder
             ],
             [
                 'student_email' => 'student.completed@example.com',
-                'course_slug' => 'introduction-to-programming',
+                'course_slug' => 'pemrograman-web',
                 'period_code' => 'PRE-U-2025-B',
                 'order_code' => 'ORD-20260509-COMPLETE',
                 'status' => 'completed',

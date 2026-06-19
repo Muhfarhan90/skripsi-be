@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Course;
 use App\Models\Section;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class SectionSeeder extends Seeder
@@ -13,28 +13,42 @@ class SectionSeeder extends Seeder
      */
     public function run(): void
     {
+        $courseBySlug = Course::query()->pluck('id', 'slug');
+
         $sections = [
             [
-                'course_id' => 1,
-                'title' => 'Getting Started',
+                'course_slug' => 'pemrograman-web',
+                'title' => 'Evaluasi dan Tugas',
                 'sort_order' => 1,
             ],
             [
-                'course_id' => 1,
-                'title' => 'Basic Concepts',
-                'sort_order' => 2,
+                'course_slug' => 'dasar-kedokteran-klinis',
+                'title' => 'Evaluasi dan Tugas',
+                'sort_order' => 1,
             ],
             [
-                'course_id' => 2,
-                'title' => 'Advanced Techniques',
+                'course_slug' => 'teknologi-pertanian-modern',
+                'title' => 'Evaluasi dan Tugas',
                 'sort_order' => 1,
             ],
         ];
 
         foreach ($sections as $section) {
+            $courseId = $courseBySlug->get($section['course_slug']);
+            if (! $courseId) {
+                continue;
+            }
+
             Section::updateOrCreate(
-                ['course_id' => $section['course_id'], 'title' => $section['title']],
-                $section
+                [
+                    'course_id' => $courseId,
+                    'title' => $section['title'],
+                ],
+                [
+                    'course_id' => $courseId,
+                    'title' => $section['title'],
+                    'sort_order' => $section['sort_order'],
+                ]
             );
         }
     }

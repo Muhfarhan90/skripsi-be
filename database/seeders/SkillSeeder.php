@@ -15,21 +15,6 @@ class SkillSeeder extends Seeder
     {
         $skills = [
             [
-                'name' => 'Java',
-                'slug' => 'java',
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Programming Fundamentals',
-                'slug' => 'programming-fundamentals',
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Problem Solving',
-                'slug' => 'problem-solving',
-                'is_active' => true,
-            ],
-            [
                 'name' => 'HTML & CSS',
                 'slug' => 'html-css',
                 'is_active' => true,
@@ -45,13 +30,33 @@ class SkillSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'name' => 'Healthy Lifestyle',
-                'slug' => 'healthy-lifestyle',
+                'name' => 'Anamnesis Dasar',
+                'slug' => 'anamnesis-dasar',
                 'is_active' => true,
             ],
             [
-                'name' => 'Wellness',
-                'slug' => 'wellness',
+                'name' => 'Keselamatan Pasien',
+                'slug' => 'keselamatan-pasien',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Studi Kasus Klinis',
+                'slug' => 'studi-kasus-klinis',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Budidaya Tanaman',
+                'slug' => 'budidaya-tanaman',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Teknologi Pertanian',
+                'slug' => 'teknologi-pertanian',
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Perencanaan Panen',
+                'slug' => 'perencanaan-panen',
                 'is_active' => true,
             ],
         ];
@@ -72,9 +77,9 @@ class SkillSeeder extends Seeder
         $courseBySlug = Course::query()->pluck('id', 'slug');
 
         $courseSkillMap = [
-            'introduction-to-programming' => ['java', 'programming-fundamentals', 'problem-solving'],
-            'advanced-web-development' => ['html-css', 'javascript', 'web-development'],
-            'health-and-wellness' => ['healthy-lifestyle', 'wellness'],
+            'pemrograman-web' => ['html-css', 'javascript', 'web-development'],
+            'dasar-kedokteran-klinis' => ['anamnesis-dasar', 'keselamatan-pasien', 'studi-kasus-klinis'],
+            'teknologi-pertanian-modern' => ['budidaya-tanaman', 'teknologi-pertanian', 'perencanaan-panen'],
         ];
 
         foreach ($courseSkillMap as $courseSlug => $skillSlugs) {
