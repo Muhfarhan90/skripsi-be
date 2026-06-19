@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Assignment;
 use App\Models\CourseOffering;
 use App\Models\Enrollment;
+use App\Models\Lesson;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Quiz;
 use App\Models\Voucher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -158,7 +161,11 @@ class OrderService
                 ]);
             }
 
-            $offerings = CourseOffering::with('course')
+            $offerings = CourseOffering::with([
+                'course.category',
+                'course.instructor',
+                'academicPeriod',
+            ])
                 ->whereIn('id', $offeringIds)
                 ->get()
                 ->keyBy('id');
@@ -181,10 +188,7 @@ class OrderService
                 $price = $this->resolveOfferingSellingPrice($offering);
 
                 $subtotal += $price;
-                $items[] = [
-                    'course_offering_id' => $offering->id,
-                    'price' => $price,
-                ];
+                $items[] = $this->buildOrderItemPayload($offering, $price);
             }
 
             $discount = 0;
@@ -529,6 +533,8 @@ class OrderService
             $payload = [
                 'course_offering_id' => $offering->id,
                 'order_id' => $order->id,
+                'completion_snapshot' => $enrollment->completion_snapshot
+                    ?: $this->buildCompletionSnapshot($offering),
                 'status' => $enrollment->status === 'completed' ? 'completed' : $status,
                 'started_at' => $startedAt,
                 'ended_at' => $endedAt,
@@ -591,6 +597,104 @@ class OrderService
         return $basePrice;
     }
 
+    private function buildOrderItemPayload(CourseOffering $offering, float $price): array
+    {
+        $offering->loadMissing(['course.category', 'course.instructor', 'academicPeriod']);
+        $course = $offering->course;
+        $academicPeriod = $offering->academicPeriod;
+
+        return [
+            'course_offering_id' => $offering->id,
+            'course_title' => $course?->title,
+            'course_slug' => $course?->slug,
+            'period_code' => $academicPeriod?->code,
+            'period_name' => $academicPeriod?->name,
+            'course_offering_snapshot' => [
+                'course_offering_id' => $offering->id,
+                'course_id' => $course?->id,
+                'course_title' => $course?->title,
+                'course_slug' => $course?->slug,
+                'category_id' => $course?->category_id,
+                'category_name' => $course?->category?->name,
+                'instructor_id' => $course?->instructor_id,
+                'instructor_name' => $course?->instructor?->fullname,
+                'academic_period_id' => $academicPeriod?->id,
+                'period_code' => $academicPeriod?->code,
+                'period_name' => $academicPeriod?->name,
+                'period_start_at' => $academicPeriod?->start_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                'period_end_at' => $academicPeriod?->end_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                'price' => $price,
+                'snapshot_at' => now()->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            ],
+            'price' => $price,
+        ];
+    }
+
+    private function buildCompletionSnapshot(CourseOffering $offering): array
+    {
+        $offering->loadMissing('course');
+        $courseId = (int) $offering->course_id;
+        $course = $offering->course;
+
+        $lessonIds = Lesson::query()
+            ->select('lessons.id')
+            ->join('sections', 'sections.id', '=', 'lessons.section_id')
+            ->where('sections.course_id', $courseId)
+            ->where('lessons.status', 'published')
+            ->orderBy('sections.sort_order')
+            ->orderBy('sections.id')
+            ->orderBy('lessons.sort_order')
+            ->orderBy('lessons.id')
+            ->pluck('lessons.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $quizzes = Quiz::query()
+            ->where('course_id', $courseId)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get(['id', 'passing_score', 'weight']);
+
+        $assignments = Assignment::query()
+            ->where('course_id', $courseId)
+            ->where('status', 'published')
+            ->orderBy('due_at')
+            ->orderBy('id')
+            ->get([
+                'id',
+                'is_required_for_certificate',
+            ]);
+
+        return [
+            'course_id' => $courseId,
+            'course_offering_id' => (int) $offering->id,
+            'lesson_ids' => $lessonIds,
+            'quiz_ids' => $quizzes->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            'assignment_ids' => $assignments->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            'required_assignment_ids' => $assignments
+                ->filter(fn (Assignment $assignment) => (bool) $assignment->is_required_for_certificate)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all(),
+            'quiz_grade_items' => $quizzes
+                ->map(fn (Quiz $quiz) => [
+                    'quiz_id' => (int) $quiz->id,
+                    'weight' => (int) ($quiz->weight ?? 0),
+                    'passing_score' => $quiz->passing_score !== null ? (int) $quiz->passing_score : null,
+                ])
+                ->values()
+                ->all(),
+            'assignment_grade_items' => $assignments
+                ->map(fn (Assignment $assignment) => [
+                    'assignment_id' => (int) $assignment->id,
+                    'is_required_for_certificate' => (bool) $assignment->is_required_for_certificate,
+                ])
+                ->values()
+                ->all(),
+            'snapshot_at' => now()->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+        ];
+    }
+
     private function buildAdminListQuery(string $search = ''): Builder
     {
         return Order::query()
@@ -613,7 +717,7 @@ class OrderService
     {
         $latestTransaction = $order->transactions->sortByDesc('id')->first();
         $courseTitles = $order->items
-            ->map(fn (OrderItem $item) => $item->courseOffering?->course?->title)
+            ->map(fn (OrderItem $item) => $item->course_title ?: $item->courseOffering?->course?->title)
             ->filter(fn (?string $title) => filled($title))
             ->implode(' | ');
 

@@ -55,6 +55,7 @@ class CourseCurriculumResource extends JsonResource
                                     'duration' => $lesson->duration,
                                     'sort_order' => $lesson->sort_order,
                                     'is_preview' => $lesson->is_preview,
+                                    'status' => $lesson->status,
                                 ];
                             }),
                         'quizzes' => $section->quizzes

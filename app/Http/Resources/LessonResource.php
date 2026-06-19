@@ -19,6 +19,7 @@ class LessonResource extends JsonResource
             'duration' => $this->duration,
             'sort_order' => $this->sort_order,
             'is_preview' => $this->is_preview,
+            'status' => $this->status,
             'created_at' => $this->created_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'updated_at' => $this->updated_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
         ];

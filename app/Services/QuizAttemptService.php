@@ -200,7 +200,7 @@ class QuizAttemptService
             ]);
         }
 
-        return DB::transaction(function () use ($attempt, $question, $data) {
+        $answer = DB::transaction(function () use ($attempt, $question, $data) {
             $answer = QuizAnswer::where('attempt_id', $attempt->id)
                 ->where('question_id', $question->id)
                 ->firstOrFail();
@@ -228,6 +228,12 @@ class QuizAttemptService
 
             return $answer->fresh();
         });
+
+        if ($attempt->enrollment_id) {
+            $this->enrollmentService->syncProgress((int) $attempt->enrollment_id);
+        }
+
+        return $answer;
     }
 
     private function persistAnswer(QuizAttempt $attempt, int $quizId, int $questionId, array $data): QuizAnswer

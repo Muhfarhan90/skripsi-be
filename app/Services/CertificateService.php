@@ -19,7 +19,8 @@ class CertificateService
     private const CERTIFICATE_DISPLAY_TIMEZONE = 'Asia/Jakarta';
 
     public function __construct(
-        protected AssignmentService $assignmentService
+        protected AssignmentService $assignmentService,
+        protected EnrollmentService $enrollmentService
     ) {}
 
     public function getUserCertificates(User $user)
@@ -53,7 +54,7 @@ class CertificateService
     {
         $enrollment = $this->findOwnedEnrollment($enrollmentId, $user);
 
-        return $this->ensureGeneratedForEnrollment($enrollment, true);
+        return $this->ensureGeneratedForEnrollment($enrollment, true, true);
     }
 
     public function getOwnedCertificate(int $certificateId, User $user): Certificate
@@ -93,7 +94,7 @@ class CertificateService
 
         $this->assertCanManageOffering($enrollment->courseOffering, $actor);
 
-        return $this->ensureGeneratedForEnrollment($enrollment, true, true);
+        return $this->ensureGeneratedForEnrollment($enrollment, true);
     }
 
     public function getDownloadFilename(Certificate $certificate): string
@@ -137,7 +138,9 @@ class CertificateService
         bool $throwWhenIneligible = false,
         bool $refreshSnapshot = false
     ): ?Certificate {
-        $enrollment->loadMissing(['courseOffering.course', 'user', 'certificate']);
+        $enrollment = $this->enrollmentService
+            ->syncProgress($enrollment->id)
+            ->fresh(['courseOffering.course', 'user', 'certificate']);
 
         if ($enrollment->status !== 'completed') {
             if ($throwWhenIneligible) {

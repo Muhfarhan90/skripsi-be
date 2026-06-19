@@ -29,6 +29,7 @@ class EnrollmentResource extends JsonResource
             'order_id' => $this->order_id,
             'last_lesson_id' => $this->last_lesson_id,
             'progress' => $this->progress,
+            'completion_snapshot' => $this->completion_snapshot,
             'status' => $this->status,
             'course' => $course ? new CourseResource($course) : null,
             'order' => new OrderResource($this->whenLoaded('order')),

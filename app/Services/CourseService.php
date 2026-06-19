@@ -103,7 +103,7 @@ class CourseService
                     $query->orderBy('sort_order')->orderBy('id');
                 },
                 'sections.lessons' => function ($query) {
-                    $query->orderBy('sort_order')->orderBy('id');
+                    $query->where('status', 'published')->orderBy('sort_order')->orderBy('id');
                 },
                 'sections.quizzes' => function ($query) {
                     $query->orderByDesc('id');
@@ -242,6 +242,7 @@ class CourseService
             $incomingSections = collect($data['sections'] ?? []);
             $existingSections = $course->sections->keyBy('id');
             $keptSectionIds = [];
+            $hasEnrollments = $this->courseHasEnrollments($courseId);
 
             foreach ($incomingSections as $sectionIndex => $sectionData) {
                 $sectionId = isset($sectionData['id']) ? (int) $sectionData['id'] : null;
@@ -292,6 +293,7 @@ class CourseService
                         'duration' => isset($lessonData['duration']) ? (int) $lessonData['duration'] : 0,
                         'sort_order' => $lessonSortOrder,
                         'is_preview' => (bool) ($lessonData['is_preview'] ?? false),
+                        'status' => $lessonData['status'] ?? 'published',
                     ]);
                     $lesson->section_id = $section->id;
                     $lesson->save();
@@ -299,14 +301,28 @@ class CourseService
                     $keptLessonIds[] = $lesson->id;
                 }
 
-                if (count($keptLessonIds) > 0) {
+                if ($hasEnrollments) {
+                    $section->lessons()
+                        ->whereNotIn('id', $keptLessonIds)
+                        ->update(['status' => 'archived']);
+                } elseif (count($keptLessonIds) > 0) {
                     $section->lessons()->whereNotIn('id', $keptLessonIds)->delete();
                 } else {
                     $section->lessons()->delete();
                 }
             }
 
-            if (count($keptSectionIds) > 0) {
+            if ($hasEnrollments) {
+                $removedSectionExists = Section::where('course_id', $courseId)
+                    ->whereNotIn('id', $keptSectionIds)
+                    ->exists();
+
+                if ($removedSectionExists) {
+                    throw ValidationException::withMessages([
+                        'sections' => ['Section tidak bisa dihapus karena course sudah memiliki enrollment. Archive lesson atau ubah konten tanpa menghapus section.'],
+                    ]);
+                }
+            } elseif (count($keptSectionIds) > 0) {
                 Section::where('course_id', $courseId)->whereNotIn('id', $keptSectionIds)->delete();
             } else {
                 Section::where('course_id', $courseId)->delete();
@@ -320,9 +336,23 @@ class CourseService
     {
         $course = $this->findById($id);
 
+        if ($this->courseHasEnrollments((int) $course->id) || $course->courseOfferings()->exists()) {
+            throw ValidationException::withMessages([
+                'course' => ['Course tidak bisa dihapus karena sudah memiliki offering atau enrollment. Nonaktifkan offering atau archive konten jika diperlukan.'],
+            ]);
+        }
+
         $course->delete();
 
         return true;
+    }
+
+    private function courseHasEnrollments(int $courseId): bool
+    {
+        return Course::query()
+            ->where('id', $courseId)
+            ->whereHas('courseOfferings.enrollments')
+            ->exists();
     }
 
     private function applyPublishedOfferingScope($query): void

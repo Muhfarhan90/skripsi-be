@@ -116,6 +116,28 @@ class EnrollmentService
         $ownedEnrollment = $this->findByIdForUser($userId, $id);
         $enrollment = $this->syncProgress($ownedEnrollment->id);
         $progress = $this->calculateLearningProgress($enrollment);
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $assignmentRequirement = $this->assignmentService->getCompletionRequirementSummary($enrollment);
+        $hasCertificate = $this->hasCertificateForEnrollment($enrollment);
+        $canGenerateCertificate = $hasCertificate
+            || (
+                (int) $progress['progress'] >= 100
+                && (string) $enrollment->status === 'completed'
+                && (bool) ($assignmentRequirement['is_satisfied'] ?? false)
+            );
+        $certificateBlockReason = null;
+
+        if (! $canGenerateCertificate) {
+            if ((int) $progress['progress'] < 100) {
+                $certificateBlockReason = 'Progress belum 100%.';
+            } elseif ((string) $enrollment->status !== 'completed') {
+                $certificateBlockReason = 'Enrollment belum completed.';
+            } elseif (! (bool) ($assignmentRequirement['is_satisfied'] ?? false)) {
+                $certificateBlockReason = 'Assignment wajib belum terpenuhi.';
+            } else {
+                $certificateBlockReason = 'Sertifikat belum memenuhi syarat generate.';
+            }
+        }
 
         return [
             'enrollment_id' => $enrollment->id,
@@ -133,11 +155,14 @@ class EnrollmentService
             'remaining_assignments' => $progress['remaining_assignments'],
             'progress' => $progress['progress'],
             'status' => $enrollment->status,
-            'has_certificate' => $this->hasCertificateForEnrollment($enrollment),
+            'has_certificate' => $hasCertificate,
+            'can_generate_certificate' => $canGenerateCertificate,
+            'certificate_block_reason' => $certificateBlockReason,
+            'completion_snapshot' => $snapshot,
             'completed_at' => $enrollment->completed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'started_at' => $enrollment->started_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'ended_at' => $this->getEffectiveEndedAt($enrollment)?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
-            'assignment_requirement' => $this->assignmentService->getCompletionRequirementSummary($enrollment),
+            'assignment_requirement' => $assignmentRequirement,
         ];
     }
 
@@ -278,12 +303,17 @@ class EnrollmentService
 
         $enrollments->setCollection(
             $enrollments->getCollection()->map(function (Enrollment $enrollment) {
-                $enrollment->setAttribute(
+                $syncedEnrollment = $this->syncProgress($enrollment->id)->fresh([
+                    'user:id,fullname,email',
+                    'certificate',
+                ]);
+
+                $syncedEnrollment->setAttribute(
                     'assignment_requirement',
-                    $this->assignmentService->getCompletionRequirementSummary($enrollment)
+                    $this->assignmentService->getCompletionRequirementSummary($syncedEnrollment)
                 );
 
-                return $enrollment;
+                return $syncedEnrollment;
             })
         );
 
@@ -323,22 +353,33 @@ class EnrollmentService
     {
         $enrollment = Enrollment::with(['order', 'courseOffering.academicPeriod', 'certificate'])->findOrFail($enrollmentId);
         $enrollment = $this->normalizePaidEnrollmentAccess($enrollment);
+        $snapshot = $this->getCompletionSnapshot($enrollment);
         $progress = $this->calculateLearningProgress($enrollment)['progress'];
+        $hasCertificate = $this->hasCertificateForEnrollment($enrollment);
 
-        $payload = ['progress' => $progress];
+        $payload = [
+            'progress' => $progress,
+            'completion_snapshot' => $snapshot,
+        ];
         $effectiveEndedAt = $this->getEffectiveEndedAt($enrollment);
         $completionRequirementMet = $this->assignmentService->isCompletionRequirementMet($enrollment);
+        $completionCriteriaMet = $progress >= 100
+            && $completionRequirementMet;
 
-        if ($progress >= 100 && $completionRequirementMet) {
+        if ($hasCertificate) {
             $payload['status'] = 'completed';
             $payload['completed_at'] = $enrollment->completed_at ?? now();
-        } elseif ($enrollment->status !== 'completed') {
-            if ($effectiveEndedAt && now()->gt($effectiveEndedAt) && $enrollment->status !== 'completed') {
+        } elseif ($completionCriteriaMet) {
+            $payload['status'] = 'completed';
+            $payload['completed_at'] = $enrollment->completed_at ?? now();
+        } elseif ((string) $enrollment->status !== 'cancelled') {
+            $payload['completed_at'] = null;
+
+            if ($enrollment->started_at && now()->lt($enrollment->started_at)) {
+                $payload['status'] = 'pending';
+            } elseif ($effectiveEndedAt && now()->gt($effectiveEndedAt)) {
                 $payload['status'] = 'expired';
-            } elseif (
-                in_array((string) $enrollment->status, ['pending', 'expired'], true)
-                && $this->isWithinWindow($enrollment)
-            ) {
+            } else {
                 $payload['status'] = 'active';
             }
         }
@@ -376,6 +417,10 @@ class EnrollmentService
         $targetIndex = array_search($lessonId, $orderedLessonIds, true);
 
         if ($targetIndex === false) {
+            if ($this->lessonBelongsToEnrollmentCourse($enrollment, $lessonId)) {
+                return;
+            }
+
             throw ValidationException::withMessages([
                 'lesson_id' => ['Lesson does not belong to the enrolled course'],
             ]);
@@ -461,12 +506,20 @@ class EnrollmentService
     private function calculateLearningProgress(Enrollment $enrollment): array
     {
         $courseId = $this->resolveCourseId($enrollment);
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $hasLessonSnapshot = array_key_exists('lesson_ids', $snapshot);
+        $hasQuizSnapshot = array_key_exists('quiz_ids', $snapshot);
+        $hasAssignmentSnapshot = array_key_exists('assignment_ids', $snapshot);
 
-        $lessonIds = Lesson::query()
-            ->select('lessons.id')
-            ->join('sections', 'sections.id', '=', 'lessons.section_id')
-            ->where('sections.course_id', $courseId)
-            ->pluck('lessons.id');
+        $lessonIds = collect($snapshot['lesson_ids'] ?? []);
+        if (! $hasLessonSnapshot) {
+            $lessonIds = Lesson::query()
+                ->select('lessons.id')
+                ->join('sections', 'sections.id', '=', 'lessons.section_id')
+                ->where('sections.course_id', $courseId)
+                ->where('lessons.status', 'published')
+                ->pluck('lessons.id');
+        }
 
         $totalLessons = $lessonIds->count();
         $completedLessons = LessonProgress::query()
@@ -475,10 +528,16 @@ class EnrollmentService
             ->whereNotNull('completed_at')
             ->count();
 
-        $quizzes = Quiz::query()
-            ->where('course_id', $courseId)
-            ->where('is_active', true)
-            ->get(['id', 'passing_score']);
+        $quizIds = collect($snapshot['quiz_ids'] ?? []);
+        $quizzes = $hasQuizSnapshot
+            ? Quiz::query()
+                ->where('course_id', $courseId)
+                ->whereIn('id', $quizIds)
+                ->get(['id', 'passing_score'])
+            : Quiz::query()
+                ->where('course_id', $courseId)
+                ->where('is_active', true)
+                ->get(['id', 'passing_score']);
 
         $totalQuizzes = $quizzes->count();
         $completedQuizzes = $quizzes->filter(function (Quiz $quiz) use ($enrollment): bool {
@@ -494,10 +553,13 @@ class EnrollmentService
             return $attemptQuery->exists();
         })->count();
 
-        $assignmentIds = Assignment::query()
-            ->where('course_id', $courseId)
-            ->where('status', 'published')
-            ->pluck('id');
+        $assignmentIds = collect($snapshot['assignment_ids'] ?? []);
+        if (! $hasAssignmentSnapshot) {
+            $assignmentIds = Assignment::query()
+                ->where('course_id', $courseId)
+                ->where('status', 'published')
+                ->pluck('id');
+        }
 
         $totalAssignments = $assignmentIds->count();
         $completedAssignments = AssignmentSubmission::query()
@@ -513,7 +575,7 @@ class EnrollmentService
             ? (int) floor(($completedItems / $totalItems) * 100)
             : 0;
 
-        return [
+        $result = [
             'total_items' => $totalItems,
             'completed_items' => $completedItems,
             'remaining_items' => max(0, $totalItems - $completedItems),
@@ -528,6 +590,20 @@ class EnrollmentService
             'remaining_assignments' => max(0, $totalAssignments - $completedAssignments),
             'progress' => $progress,
         ];
+
+        if ($enrollment->status === 'completed' || $this->hasCertificateForEnrollment($enrollment)) {
+            $result['completed_items'] = $result['total_items'];
+            $result['remaining_items'] = 0;
+            $result['completed_lessons'] = $result['total_lessons'];
+            $result['remaining_lessons'] = 0;
+            $result['completed_quizzes'] = $result['total_quizzes'];
+            $result['remaining_quizzes'] = 0;
+            $result['completed_assignments'] = $result['total_assignments'];
+            $result['remaining_assignments'] = 0;
+            $result['progress'] = 100;
+        }
+
+        return $result;
     }
 
     private function resolveCourseId(Enrollment $enrollment): int
@@ -545,11 +621,20 @@ class EnrollmentService
     private function getOrderedLessonIdsForEnrollment(Enrollment $enrollment): array
     {
         $courseId = $this->resolveCourseId($enrollment);
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $snapshotLessonIds = collect($snapshot['lesson_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (array_key_exists('lesson_ids', $snapshot)) {
+            return $snapshotLessonIds;
+        }
 
         return Lesson::query()
             ->select('lessons.id')
             ->join('sections', 'sections.id', '=', 'lessons.section_id')
             ->where('sections.course_id', $courseId)
+            ->where('lessons.status', 'published')
             ->orderBy('sections.sort_order')
             ->orderBy('sections.id')
             ->orderBy('lessons.sort_order')
@@ -557,6 +642,18 @@ class EnrollmentService
             ->pluck('lessons.id')
             ->map(fn ($id) => (int) $id)
             ->all();
+    }
+
+    private function lessonBelongsToEnrollmentCourse(Enrollment $enrollment, int $lessonId): bool
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+
+        return Lesson::query()
+            ->where('id', $lessonId)
+            ->whereHas('section', function ($query) use ($courseId) {
+                $query->where('course_id', $courseId);
+            })
+            ->exists();
     }
 
     private function normalizePaidEnrollmentAccess(Enrollment $enrollment): Enrollment
@@ -599,21 +696,205 @@ class EnrollmentService
         ]);
     }
 
+    private function getCompletionSnapshot(Enrollment $enrollment): array
+    {
+        if (is_array($enrollment->completion_snapshot) && ! $this->completionSnapshotNeedsRefresh($enrollment->completion_snapshot)) {
+            return $enrollment->completion_snapshot;
+        }
+
+        $existingSnapshot = is_array($enrollment->completion_snapshot) ? $enrollment->completion_snapshot : null;
+        $snapshot = $this->buildCompletionSnapshot($enrollment, $existingSnapshot);
+        $enrollment->forceFill(['completion_snapshot' => $snapshot])->save();
+        $enrollment->completion_snapshot = $snapshot;
+
+        return $snapshot;
+    }
+
+    private function buildCompletionSnapshot(Enrollment $enrollment, ?array $existingSnapshot = null): array
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+        Course::query()->select(['id'])->findOrFail($courseId);
+        $enrollment->loadMissing('courseOffering');
+        $snapshotLessonIds = $this->normalizeSnapshotIdList($existingSnapshot['lesson_ids'] ?? null);
+        $lessonIds = $snapshotLessonIds
+            ?? Lesson::query()
+                ->select('lessons.id')
+                ->join('sections', 'sections.id', '=', 'lessons.section_id')
+                ->where('sections.course_id', $courseId)
+                ->where('lessons.status', 'published')
+                ->orderBy('sections.sort_order')
+                ->orderBy('sections.id')
+                ->orderBy('lessons.sort_order')
+                ->orderBy('lessons.id')
+                ->pluck('lessons.id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+        $snapshotQuizIds = $this->normalizeSnapshotIdList($existingSnapshot['quiz_ids'] ?? null);
+        $quizQuery = Quiz::query()
+            ->where('course_id', $courseId);
+
+        if ($snapshotQuizIds !== null) {
+            $quizQuery->whereIn('id', $snapshotQuizIds);
+        } else {
+            $quizQuery->where('is_active', true);
+        }
+
+        $quizzes = $quizQuery
+            ->orderBy('id')
+            ->get(['id', 'passing_score', 'weight'])
+            ->keyBy('id');
+
+        $quizIds = $snapshotQuizIds !== null
+            ? collect($snapshotQuizIds)
+                ->filter(fn ($quizId) => $quizzes->has($quizId))
+                ->values()
+                ->all()
+            : $quizzes->keys()->map(fn ($id) => (int) $id)->values()->all();
+
+        $snapshotAssignmentIds = $this->normalizeSnapshotIdList($existingSnapshot['assignment_ids'] ?? null);
+        $assignmentQuery = Assignment::query()
+            ->where('course_id', $courseId)
+            ->when(
+                $snapshotAssignmentIds !== null,
+                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
+                fn ($query) => $query->where('status', 'published')
+            );
+
+        $assignments = $assignmentQuery
+            ->orderBy('due_at')
+            ->orderBy('id')
+            ->get([
+                'id',
+                'is_required_for_certificate',
+            ])
+            ->keyBy('id');
+
+        $assignmentIds = $snapshotAssignmentIds !== null
+            ? collect($snapshotAssignmentIds)
+                ->filter(fn ($assignmentId) => $assignments->has($assignmentId))
+                ->values()
+                ->all()
+            : $assignments->keys()->map(fn ($id) => (int) $id)->values()->all();
+
+        $snapshotRequiredAssignmentIds = $this->normalizeSnapshotIdList($existingSnapshot['required_assignment_ids'] ?? null);
+        $requiredAssignmentIds = $snapshotRequiredAssignmentIds !== null
+            ? collect($snapshotRequiredAssignmentIds)
+                ->filter(fn ($assignmentId) => in_array($assignmentId, $assignmentIds, true))
+                ->values()
+                ->all()
+            : collect($assignmentIds)
+                ->filter(fn ($assignmentId) => (bool) optional($assignments->get($assignmentId))->is_required_for_certificate)
+                ->values()
+                ->all();
+
+        $quizGradeItems = collect($quizIds)
+            ->map(function (int $quizId) use ($quizzes): ?array {
+                $quiz = $quizzes->get($quizId);
+
+                if (! $quiz) {
+                    return null;
+                }
+
+                return [
+                    'quiz_id' => (int) $quiz->id,
+                    'weight' => (int) ($quiz->weight ?? 0),
+                    'passing_score' => $quiz->passing_score !== null ? (int) $quiz->passing_score : null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $assignmentGradeItems = collect($assignmentIds)
+            ->map(function (int $assignmentId) use ($assignments): ?array {
+                $assignment = $assignments->get($assignmentId);
+
+                if (! $assignment) {
+                    return null;
+                }
+
+                return [
+                    'assignment_id' => (int) $assignment->id,
+                    'is_required_for_certificate' => (bool) $assignment->is_required_for_certificate,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return [
+            'course_id' => $courseId,
+            'course_offering_id' => $enrollment->courseOffering?->id,
+            'lesson_ids' => $lessonIds,
+            'quiz_ids' => $quizIds,
+            'assignment_ids' => $assignmentIds,
+            'required_assignment_ids' => $requiredAssignmentIds,
+            'quiz_grade_items' => $quizGradeItems,
+            'assignment_grade_items' => $assignmentGradeItems,
+            'snapshot_at' => $existingSnapshot['snapshot_at'] ?? now()->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+        ];
+    }
+
     private function assertCompletionRequirementSatisfied(Enrollment $enrollment): void
     {
         $summary = $this->assignmentService->getCompletionRequirementSummary($enrollment);
-        if ($summary['is_satisfied']) {
-            return;
-        }
+        $messages = [];
 
-        throw ValidationException::withMessages([
-            'assignment' => [
+        if (! $summary['is_satisfied']) {
+            $messages['assignment'] = [
                 sprintf(
                     'Required assignments approved: %d/%d. Certificate is blocked until all required assignments are approved.',
                     (int) $summary['approved_assignments'],
                     (int) $summary['required_assignments']
                 ),
-            ],
-        ]);
+            ];
+        }
+
+        if ($messages !== []) {
+            throw ValidationException::withMessages($messages);
+        }
+    }
+
+    private function completionSnapshotNeedsRefresh(?array $snapshot): bool
+    {
+        if (! is_array($snapshot)) {
+            return true;
+        }
+
+        return ! isset(
+            $snapshot['course_id'],
+            $snapshot['course_offering_id'],
+            $snapshot['lesson_ids'],
+            $snapshot['quiz_ids'],
+            $snapshot['assignment_ids'],
+            $snapshot['required_assignment_ids'],
+            $snapshot['quiz_grade_items'],
+            $snapshot['assignment_grade_items'],
+            $snapshot['snapshot_at'],
+        )
+            || ! is_array($snapshot['quiz_grade_items'])
+            || ! is_array($snapshot['assignment_grade_items']);
+    }
+
+    private function normalizeSnapshotIdList(mixed $value): ?array
+    {
+        if (! is_array($value)) {
+            return null;
+        }
+
+        $normalized = [];
+
+        foreach ($value as $id) {
+            $normalizedId = (int) $id;
+
+            if ($normalizedId <= 0 || in_array($normalizedId, $normalized, true)) {
+                continue;
+            }
+
+            $normalized[] = $normalizedId;
+        }
+
+        return $normalized;
     }
 }

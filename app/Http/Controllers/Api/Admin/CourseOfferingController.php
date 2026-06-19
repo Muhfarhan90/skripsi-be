@@ -109,6 +109,7 @@ class CourseOfferingController extends Controller
         $courseId = (int) ($payload['course_id'] ?? $offering->course_id);
         $course = Course::query()->findOrFail($courseId);
         $this->assertCanManageCourse($course, $request->user());
+        $this->assertOfferingUpdateAllowed($offering, $payload);
 
         $offering->update($payload);
 
@@ -298,5 +299,73 @@ class CourseOfferingController extends Controller
         $actor->loadMissing('role');
 
         return $actor->role?->name === 'instructor';
+    }
+
+    private function assertOfferingUpdateAllowed(CourseOffering $offering, array $payload): void
+    {
+        $offering->loadCount(['enrollments', 'orderItems']);
+
+        $hasEnrollments = (int) ($offering->enrollments_count ?? 0) > 0;
+        $hasOrders = (int) ($offering->order_items_count ?? 0) > 0;
+
+        if ($hasEnrollments || $hasOrders) {
+            $this->assertImmutableFieldsUnchanged($offering, $payload, [
+                'course_id' => 'Course tidak bisa diubah karena offering sudah memiliki enrollment atau order.',
+                'academic_period_id' => 'Academic period tidak bisa diubah karena offering sudah memiliki enrollment atau order.',
+            ]);
+        }
+
+        if ($hasOrders) {
+            $this->assertImmutableFieldsUnchanged($offering, $payload, [
+                'price' => 'Harga tidak bisa diubah karena offering sudah memiliki order.',
+                'discount_price' => 'Harga diskon tidak bisa diubah karena offering sudah memiliki order.',
+            ]);
+        }
+
+        if (array_key_exists('capacity', $payload)) {
+            $activeEnrollmentCount = $offering->enrollments()
+                ->whereIn('status', ['pending', 'active', 'completed'])
+                ->count();
+
+            if ((int) $payload['capacity'] < $activeEnrollmentCount) {
+                throw ValidationException::withMessages([
+                    'capacity' => [
+                        sprintf(
+                            'Capacity tidak boleh lebih kecil dari jumlah enrollment aktif/pending/completed saat ini (%d).',
+                            $activeEnrollmentCount
+                        ),
+                    ],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $fields
+     */
+    private function assertImmutableFieldsUnchanged(CourseOffering $offering, array $payload, array $fields): void
+    {
+        foreach ($fields as $field => $message) {
+            if (! array_key_exists($field, $payload)) {
+                continue;
+            }
+
+            $current = $offering->{$field};
+            $incoming = $payload[$field];
+
+            if (in_array($field, ['price', 'discount_price'], true)) {
+                $current = $current === null ? null : (float) $current;
+                $incoming = $incoming === null || $incoming === '' ? null : (float) $incoming;
+            } else {
+                $current = $current === null ? null : (int) $current;
+                $incoming = $incoming === null || $incoming === '' ? null : (int) $incoming;
+            }
+
+            if ($current !== $incoming) {
+                throw ValidationException::withMessages([
+                    $field => [$message],
+                ]);
+            }
+        }
     }
 }

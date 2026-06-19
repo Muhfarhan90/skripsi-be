@@ -22,10 +22,15 @@ class AssignmentService
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
         $courseId = $this->resolveCourseId($enrollment);
+        $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
 
         $assignments = Assignment::query()
             ->where('course_id', $courseId)
-            ->where('status', 'published')
+            ->when(
+                $snapshotAssignmentIds !== null,
+                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
+                fn ($query) => $query->where('status', 'published')
+            )
             ->with([
                 'section:id,course_id,title',
                 'submissions' => function ($query) use ($enrollment) {
@@ -53,11 +58,16 @@ class AssignmentService
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
         $courseId = $this->resolveCourseId($enrollment);
+        $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
 
         $assignment = Assignment::query()
             ->where('id', $assignmentId)
             ->where('course_id', $courseId)
-            ->where('status', 'published')
+            ->when(
+                $snapshotAssignmentIds !== null,
+                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
+                fn ($query) => $query->where('status', 'published')
+            )
             ->with([
                 'section:id,course_id,title',
                 'submissions' => function ($query) use ($enrollment) {
@@ -79,11 +89,16 @@ class AssignmentService
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
         $courseId = $this->resolveCourseId($enrollment);
+        $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
 
         $assignment = Assignment::query()
             ->where('id', $assignmentId)
             ->where('course_id', $courseId)
-            ->where('status', 'published')
+            ->when(
+                $snapshotAssignmentIds !== null,
+                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
+                fn ($query) => $query->where('status', 'published')
+            )
             ->firstOrFail();
 
         $this->assertStudentCanSubmit($enrollment, $assignment);
@@ -188,14 +203,21 @@ class AssignmentService
     {
         $course = Course::query()->findOrFail($courseId);
         $this->assertCanManageCourse($course, $actor);
-        $sectionId = $this->resolveSectionIdForCourse($course, $data['section_id'] ?? null);
+        $sectionProvided = array_key_exists('section_id', $data);
+        $sectionId = $sectionProvided
+            ? $this->resolveSectionIdForCourse($course, $data['section_id'] ?? null)
+            : null;
 
         $assignment = Assignment::query()
             ->where('id', $assignmentId)
             ->where('course_id', $course->id)
             ->firstOrFail();
 
-        $data['section_id'] = $sectionId;
+        $this->assertAssignmentUpdateAllowed($assignment, $data);
+        if ($sectionProvided) {
+            $data['section_id'] = $sectionId;
+        }
+
         $assignment->update($data);
 
         return $assignment->fresh(['creator:id,fullname', 'section:id,course_id,title']);
@@ -335,6 +357,11 @@ class AssignmentService
 
     private function getRequiredAssignmentIdsForEnrollment(Enrollment $enrollment): array
     {
+        $snapshotRequiredIds = $this->getSnapshotIds($enrollment, 'required_assignment_ids');
+        if ($snapshotRequiredIds !== null) {
+            return $snapshotRequiredIds;
+        }
+
         $courseId = $this->resolveCourseId($enrollment);
 
         return Assignment::query()
@@ -342,6 +369,21 @@ class AssignmentService
             ->where('status', 'published')
             ->where('is_required_for_certificate', true)
             ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * @return array<int>|null
+     */
+    private function getSnapshotIds(Enrollment $enrollment, string $key): ?array
+    {
+        if (! is_array($enrollment->completion_snapshot)) {
+            return null;
+        }
+
+        return collect($enrollment->completion_snapshot[$key] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->values()
             ->all();
     }
 
@@ -433,5 +475,58 @@ class AssignmentService
         }
 
         return (int) $resolvedSection->id;
+    }
+
+    private function assertAssignmentUpdateAllowed(Assignment $assignment, array $data): void
+    {
+        if (! $assignment->submissions()->exists()) {
+            return;
+        }
+
+        $lockedFields = [
+            'course_id',
+            'section_id',
+            'due_at',
+            'is_required_for_certificate',
+            'allow_resubmission',
+            'max_attempts',
+            'status',
+        ];
+
+        foreach ($lockedFields as $field) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $current = $assignment->{$field};
+            $incoming = $data[$field];
+
+            if ($this->normalizeComparableValue($current) !== $this->normalizeComparableValue($incoming)) {
+                throw ValidationException::withMessages([
+                    $field => ['Assignment sudah memiliki submission, field ini tidak bisa diubah. Buat assignment baru untuk perubahan syarat.'],
+                ]);
+            }
+        }
+    }
+
+    private function normalizeComparableValue(mixed $value): mixed
+    {
+        if ($value instanceof Carbon) {
+            return $value->copy()->utc()->timestamp;
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if (is_numeric($value)) {
+            return (string) $value;
+        }
+
+        if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}/', $value) === 1) {
+            return Carbon::parse($value)->utc()->timestamp;
+        }
+
+        return $value;
     }
 }

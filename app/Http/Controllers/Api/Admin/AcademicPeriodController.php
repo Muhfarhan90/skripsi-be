@@ -9,6 +9,7 @@ use App\Http\Resources\AcademicPeriodResource;
 use App\Models\AcademicPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class AcademicPeriodController extends Controller
@@ -69,7 +70,10 @@ class AcademicPeriodController extends Controller
     public function update(UpdateAcademicPeriodRequest $request, string $id)
     {
         $period = AcademicPeriod::query()->findOrFail((int) $id);
-        $period->update($request->validated());
+        $payload = $request->validated();
+        $this->assertPeriodUpdateAllowed($period, $payload);
+
+        $period->update($payload);
 
         return response()->json([
             'success' => true,
@@ -155,5 +159,48 @@ class AcademicPeriodController extends Controller
                         ->orderByDesc('id');
                 },
             ]);
+    }
+
+    private function assertPeriodUpdateAllowed(AcademicPeriod $period, array $payload): void
+    {
+        $hasUsedOffering = $period->courseOfferings()
+            ->where(function ($query) {
+                $query
+                    ->whereHas('enrollments')
+                    ->orWhereHas('orderItems');
+            })
+            ->exists();
+
+        if (! $hasUsedOffering) {
+            return;
+        }
+
+        $lockedFields = [
+            'code',
+            'start_at',
+            'end_at',
+            'enrollment_open_at',
+            'enrollment_close_at',
+        ];
+
+        foreach ($lockedFields as $field) {
+            if (! array_key_exists($field, $payload)) {
+                continue;
+            }
+
+            $current = $period->{$field};
+            $incoming = $payload[$field];
+
+            if (str_ends_with($field, '_at')) {
+                $current = $current ? $current->copy()->utc()->timestamp : null;
+                $incoming = $incoming ? Carbon::parse((string) $incoming)->utc()->timestamp : null;
+            }
+
+            if ($current !== $incoming) {
+                throw ValidationException::withMessages([
+                    $field => ['Field ini tidak bisa diubah karena academic period sudah dipakai offering yang memiliki order atau enrollment.'],
+                ]);
+            }
+        }
     }
 }

@@ -17,7 +17,12 @@ class Lesson extends Model
         'lesson_url',
         'duration',
         'sort_order',
-        'is_preview'
+        'is_preview',
+        'status',
+    ];
+
+    protected $casts = [
+        'is_preview' => 'boolean',
     ];
 
     public function section()

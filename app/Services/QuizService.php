@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Course;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\Section;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -75,6 +76,7 @@ class QuizService
     {
         return DB::transaction(function () use ($id, $data) {
             $quiz = $this->findById($id);
+            $this->assertQuizUpdateAllowed($quiz, $data);
             $nextCourseId = isset($data['course_id']) ? (int) $data['course_id'] : (int) $quiz->course_id;
             $nextSectionId = isset($data['section_id']) ? (int) $data['section_id'] : (int) $quiz->section_id;
 
@@ -95,6 +97,7 @@ class QuizService
             $quiz = Quiz::where('id', $quizId)
                 ->where('course_id', $courseId)
                 ->firstOrFail();
+            $this->assertQuizUpdateAllowed($quiz, $data);
 
             $this->ensureSectionBelongsToCourse($courseId, $sectionId);
             $this->assertQuizWindowRange(array_merge([
@@ -133,6 +136,7 @@ class QuizService
     {
         return DB::transaction(function () use ($id) {
             $quiz = $this->findById($id);
+            $this->assertQuizHasNoAttempts($quiz);
 
             foreach ($quiz->questions()->get() as $question) {
                 $question->options()->delete();
@@ -176,5 +180,54 @@ class QuizService
                 'close_at' => ['Quiz close_at must be greater than or equal to open_at.'],
             ]);
         }
+    }
+
+    private function assertQuizUpdateAllowed(Quiz $quiz, array $data): void
+    {
+        if (! QuizAttempt::where('quiz_id', $quiz->id)->exists()) {
+            return;
+        }
+
+        $lockedFields = [
+            'course_id',
+            'section_id',
+            'passing_score',
+            'weight',
+            'is_active',
+            'is_random',
+            'max_attempts',
+        ];
+
+        foreach ($lockedFields as $field) {
+            if (array_key_exists($field, $data) && $this->normalizeComparableValue($data[$field]) !== $this->normalizeComparableValue($quiz->{$field})) {
+                throw ValidationException::withMessages([
+                    $field => ['Quiz sudah memiliki attempt, field ini tidak bisa diubah. Buat quiz baru untuk perubahan struktur evaluasi.'],
+                ]);
+            }
+        }
+    }
+
+    private function normalizeComparableValue(mixed $value): mixed
+    {
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if (is_numeric($value)) {
+            return (string) $value;
+        }
+
+        return $value;
+    }
+
+    private function assertQuizHasNoAttempts(Quiz $quiz): void
+    {
+        if (! QuizAttempt::where('quiz_id', $quiz->id)->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'quiz' => ['Quiz tidak bisa dihapus karena sudah memiliki attempt. Nonaktifkan atau buat quiz baru sebagai pengganti.'],
+        ]);
     }
 }

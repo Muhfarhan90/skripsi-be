@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Option;
 use App\Models\Question;
+use App\Models\QuizAttempt;
 use Illuminate\Validation\ValidationException;
 
 class OptionService
@@ -27,12 +28,16 @@ class OptionService
 
     public function create(array $data)
     {
+        $question = Question::findOrFail((int) ($data['question_id'] ?? 0));
+        $this->assertQuestionQuizHasNoAttempts($question);
+
         return Option::create($data);
     }
 
     public function createForQuestion(int $questionId, array $data): Option
     {
-        Question::findOrFail($questionId);
+        $question = Question::findOrFail($questionId);
+        $this->assertQuestionQuizHasNoAttempts($question);
 
         return Option::create(array_merge($data, [
             'question_id' => $questionId,
@@ -42,6 +47,8 @@ class OptionService
     public function update(int $id, array $data)
     {
         $option = $this->findById($id);
+        $option->loadMissing('question');
+        $this->assertQuestionQuizHasNoAttempts($option->question);
         $option->update($data);
 
         return $option;
@@ -50,6 +57,8 @@ class OptionService
     public function updateForQuestion(int $questionId, int $optionId, array $data): Option
     {
         $option = $this->findByIdInQuestion($questionId, $optionId);
+        $option->loadMissing('question');
+        $this->assertQuestionQuizHasNoAttempts($option->question);
 
         if (array_key_exists('question_id', $data) && (int) $data['question_id'] !== $questionId) {
             throw ValidationException::withMessages([
@@ -64,6 +73,8 @@ class OptionService
     public function delete(int $id)
     {
         $option = $this->findById($id);
+        $option->loadMissing('question');
+        $this->assertQuestionQuizHasNoAttempts($option->question);
         $option->delete();
 
         return true;
@@ -72,8 +83,21 @@ class OptionService
     public function deleteForQuestion(int $questionId, int $optionId): bool
     {
         $option = $this->findByIdInQuestion($questionId, $optionId);
+        $option->loadMissing('question');
+        $this->assertQuestionQuizHasNoAttempts($option->question);
         $option->delete();
 
         return true;
+    }
+
+    private function assertQuestionQuizHasNoAttempts(?Question $question): void
+    {
+        if (! $question || ! QuizAttempt::where('quiz_id', $question->quiz_id)->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'quiz' => ['Option tidak bisa diubah karena quiz sudah memiliki attempt. Buat quiz baru untuk perubahan jawaban.'],
+        ]);
     }
 }

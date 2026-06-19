@@ -43,6 +43,7 @@ class AdminOfferingEnrollmentResource extends JsonResource
             'order_id' => $this->order_id,
             'last_lesson_id' => $this->last_lesson_id,
             'progress' => $this->progress,
+            'completion_snapshot' => $this->completion_snapshot,
             'status' => $this->status,
             'user' => $user ? [
                 'id' => $user->id,

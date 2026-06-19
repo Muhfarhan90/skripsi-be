@@ -42,6 +42,7 @@ class UpsertCourseCurriculumRequest extends FormRequest
             'sections.*.lessons.*.duration' => ['nullable', 'integer', 'min:0'],
             'sections.*.lessons.*.sort_order' => ['nullable', 'integer', 'min:1'],
             'sections.*.lessons.*.is_preview' => ['nullable', 'boolean'],
+            'sections.*.lessons.*.status' => ['nullable', 'in:published,archived'],
         ];
     }
 }

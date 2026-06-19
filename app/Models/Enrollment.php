@@ -15,6 +15,7 @@ class Enrollment extends Model
         'order_id',
         'last_lesson_id',
         'progress',
+        'completion_snapshot',
         'status',
         'completed_at',
         'started_at',
@@ -23,6 +24,7 @@ class Enrollment extends Model
     ];
 
     protected $casts = [
+        'completion_snapshot' => 'array',
         'completed_at' => 'datetime',
         'started_at' => 'datetime',
         'ended_at' => 'datetime',

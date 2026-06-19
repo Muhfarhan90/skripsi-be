@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Question;
 use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +42,7 @@ class QuestionService
     {
         $quizId = (int) ($data['quiz_id'] ?? 0);
         Quiz::findOrFail($quizId);
+        $this->assertQuizHasNoAttempts($quizId);
 
         if (!isset($data['sort_order']) || $data['sort_order'] == 0) {
             $data['sort_order'] = Question::where('quiz_id', $quizId)
@@ -57,6 +59,7 @@ class QuestionService
     public function createForQuiz(int $quizId, array $data): Question
     {
         Quiz::findOrFail($quizId);
+        $this->assertQuizHasNoAttempts($quizId);
 
         return DB::transaction(function () use ($quizId, $data) {
             $payload = array_merge($data, [
@@ -78,6 +81,7 @@ class QuestionService
     {
         return DB::transaction(function () use ($id, $data) {
             $question = $this->findById($id);
+            $this->assertQuizHasNoAttempts((int) $question->quiz_id);
 
             if (isset($data['sort_order']) && $data['sort_order'] != $question->sort_order) {
                 $this->handleReorder($question, $data['sort_order']);
@@ -94,6 +98,7 @@ class QuestionService
     {
         return DB::transaction(function () use ($quizId, $questionId, $data) {
             $question = $this->findByIdInQuiz($quizId, $questionId);
+            $this->assertQuizHasNoAttempts($quizId);
 
             if (array_key_exists('quiz_id', $data) && (int) $data['quiz_id'] !== $quizId) {
                 throw ValidationException::withMessages([
@@ -115,6 +120,7 @@ class QuestionService
     public function reorderForQuiz(int $quizId, array $questionIds): void
     {
         Quiz::findOrFail($quizId);
+        $this->assertQuizHasNoAttempts($quizId);
 
         $normalizedIds = array_values(array_map('intval', $questionIds));
         if (count($normalizedIds) === 0) {
@@ -170,6 +176,7 @@ class QuestionService
     {
         return DB::transaction(function () use ($id) {
             $question = $this->findById($id);
+            $this->assertQuizHasNoAttempts((int) $question->quiz_id);
             $question->options()->delete();
             $deletedOrder = $question->sort_order;
             $quizId = (int) $question->quiz_id;
@@ -191,6 +198,7 @@ class QuestionService
     {
         return DB::transaction(function () use ($quizId, $questionId) {
             $question = $this->findByIdInQuiz($quizId, $questionId);
+            $this->assertQuizHasNoAttempts($quizId);
             $question->options()->delete();
             $deletedOrder = (int) $question->sort_order;
             $question->delete();
@@ -227,5 +235,16 @@ class QuestionService
                 $question->update(['score' => $score]);
             }
         }
+    }
+
+    private function assertQuizHasNoAttempts(int $quizId): void
+    {
+        if (! QuizAttempt::where('quiz_id', $quizId)->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'quiz' => ['Question tidak bisa diubah karena quiz sudah memiliki attempt. Buat quiz baru untuk perubahan soal.'],
+        ]);
     }
 }

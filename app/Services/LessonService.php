@@ -70,6 +70,12 @@ class LessonService
     public function delete(int $id)
     {
         $lesson = $this->findById($id);
+        if ($lesson->lessonProgresses()->exists()) {
+            $lesson->update(['status' => 'archived']);
+
+            return true;
+        }
+
         $deletedOrder = $lesson->sort_order;
         $sectionId = $lesson->section_id;
 

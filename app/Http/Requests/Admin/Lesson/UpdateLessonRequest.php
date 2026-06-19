@@ -24,6 +24,7 @@ use Illuminate\Foundation\Http\FormRequest;
             'duration' => ['nullable', 'integer'],
             'sort_order' => ['nullable', 'integer'],
             'is_preview' => ['nullable', 'boolean'],
+            'status' => ['nullable', 'in:published,archived'],
         ];
     }
 }
