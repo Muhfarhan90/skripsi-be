@@ -27,7 +27,9 @@ it('returns composed default website home content for public visitors', function
 
     $response->assertOk()
         ->assertJsonPath('success', true)
-        ->assertJsonPath('data.site_name', 'SkripsiLMS')
+        ->assertJsonPath('data.site_name', 'UPNVJT Pre-University')
+        ->assertJsonPath('data.site_tagline', 'Mempersiapkan transisi akademik Anda dari sekolah menengah ke perguruan tinggi. Akses materi belajar terstruktur, uji pemahaman lewat kuis, dan raih sertifikat kesiapan kuliah.')
+        ->assertJsonPath('data.contact_email', 'customersupport@upnvjt-preuniversity.com')
         ->assertJsonPath('data.hero_title', 'Belajar lebih cepat,')
         ->assertJsonPath('data.feature_items.0.icon', 'book-open')
         ->assertJsonPath('data.hero_image_url', 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80')

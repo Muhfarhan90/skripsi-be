@@ -264,13 +264,13 @@ class WebsiteSettingService
     private function settingsDefaults(): array
     {
         return [
-            'site_name' => 'Platform Belajar',
-            'site_tagline' => 'Platform Belajar Pre-University',
+            'site_name' => 'UPNVJT Pre-University',
+            'site_tagline' => 'Mempersiapkan transisi akademik Anda dari sekolah menengah ke perguruan tinggi. Akses materi belajar terstruktur, uji pemahaman lewat kuis, dan raih sertifikat kesiapan kuliah.',
             'logo_url' => null,
-            'footer_text' => 'Copyright {year} {site_name} - Platform Belajar Pre-University',
-            'contact_email' => null,
-            'contact_phone' => null,
-            'address' => null,
+            'footer_text' => 'Copyright 2026 UPNVJT - Platform Belajar Pre-University',
+            'contact_email' => 'customersupport@upnvjt-preuniversity.com',
+            'contact_phone' => '(031) 8706369',
+            'address' => 'Jl. Rungkut Madya, Gn. Anyar, Kec. Gn. Anyar, Surabaya, Jawa Timur 60294',
         ];
     }
 
