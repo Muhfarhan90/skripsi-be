@@ -62,7 +62,7 @@ class EnrollmentController extends Controller
             ]);
         }
 
-        $course = Course::query()
+        $course = Course::withTrashed()
             ->with([
                 'category:id,name',
                 'instructor:id,fullname',

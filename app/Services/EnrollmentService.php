@@ -266,7 +266,7 @@ class EnrollmentService
 
     public function getByCourseIdForAdmin(int $courseId)
     {
-        $course = Course::findOrFail($courseId);
+        $course = Course::withTrashed()->findOrFail($courseId);
 
         return Enrollment::whereHas('courseOffering', function ($query) use ($course) {
             $query->where('course_id', $course->id);
@@ -713,7 +713,7 @@ class EnrollmentService
     private function buildCompletionSnapshot(Enrollment $enrollment, ?array $existingSnapshot = null): array
     {
         $courseId = $this->resolveCourseId($enrollment);
-        Course::query()->select(['id'])->findOrFail($courseId);
+        Course::withTrashed()->select(['id'])->findOrFail($courseId);
         $enrollment->loadMissing('courseOffering');
         $snapshotLessonIds = $this->normalizeSnapshotIdList($existingSnapshot['lesson_ids'] ?? null);
         $lessonIds = $snapshotLessonIds

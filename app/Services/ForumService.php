@@ -333,12 +333,12 @@ class ForumService
         $user->loadMissing('role');
 
         if ($this->isAdmin($user)) {
-            Course::findOrFail($courseId);
+            Course::withTrashed()->findOrFail($courseId);
             return;
         }
 
         if ($this->isInstructor($user)) {
-            $isTeaching = Course::where('id', $courseId)
+            $isTeaching = Course::withTrashed()->where('id', $courseId)
                 ->where('instructor_id', $user->id)
                 ->exists();
 

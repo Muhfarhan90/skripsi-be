@@ -134,7 +134,7 @@ class ReviewService
         $user->loadMissing('role');
 
         if ($user->role && $user->role->name === 'admin') {
-            Course::findOrFail($courseId);
+            Course::withTrashed()->findOrFail($courseId);
             return;
         }
 
