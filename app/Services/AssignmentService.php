@@ -10,6 +10,7 @@ use App\Models\Enrollment;
 use App\Models\Section;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 class AssignmentService
@@ -105,9 +106,15 @@ class AssignmentService
 
         $submissionText = $data['submission_text'] ?? null;
         $attachmentUrl = $data['attachment_url'] ?? null;
+        $attachmentFile = $data['attachment_file'] ?? null;
+
+        if ($attachmentFile instanceof UploadedFile) {
+            $attachmentUrl = '/storage/'.$attachmentFile->store('assignment-submissions', 'public');
+        }
+
         if (($submissionText === null || trim((string) $submissionText) === '') && ($attachmentUrl === null || trim((string) $attachmentUrl) === '')) {
             throw ValidationException::withMessages([
-                'submission' => ['Please provide submission_text or attachment_url.'],
+                'submission' => ['Please provide submission_text, attachment_url, or attachment_file.'],
             ]);
         }
 

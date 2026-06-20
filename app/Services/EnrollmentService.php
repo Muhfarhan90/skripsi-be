@@ -153,6 +153,8 @@ class EnrollmentService
             'total_assignments' => $progress['total_assignments'],
             'completed_assignments' => $progress['completed_assignments'],
             'remaining_assignments' => $progress['remaining_assignments'],
+            'passed_quiz_ids' => $progress['passed_quiz_ids'] ?? [],
+            'approved_assignment_ids' => $progress['approved_assignment_ids'] ?? [],
             'progress' => $progress['progress'],
             'status' => $enrollment->status,
             'has_certificate' => $hasCertificate,
@@ -540,7 +542,7 @@ class EnrollmentService
                 ->get(['id', 'passing_score']);
 
         $totalQuizzes = $quizzes->count();
-        $completedQuizzes = $quizzes->filter(function (Quiz $quiz) use ($enrollment): bool {
+        $passedQuizIds = $quizzes->filter(function (Quiz $quiz) use ($enrollment): bool {
             $attemptQuery = QuizAttempt::query()
                 ->where('enrollment_id', $enrollment->id)
                 ->where('quiz_id', $quiz->id)
@@ -551,7 +553,11 @@ class EnrollmentService
             }
 
             return $attemptQuery->exists();
-        })->count();
+        })->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+        $completedQuizzes = count($passedQuizIds);
 
         $assignmentIds = collect($snapshot['assignment_ids'] ?? []);
         if (! $hasAssignmentSnapshot) {
@@ -562,12 +568,16 @@ class EnrollmentService
         }
 
         $totalAssignments = $assignmentIds->count();
-        $completedAssignments = AssignmentSubmission::query()
+        $approvedAssignmentIds = AssignmentSubmission::query()
             ->where('enrollment_id', $enrollment->id)
             ->whereIn('assignment_id', $assignmentIds)
             ->where('status', 'approved')
-            ->distinct('assignment_id')
-            ->count('assignment_id');
+            ->pluck('assignment_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $completedAssignments = count($approvedAssignmentIds);
 
         $totalItems = $totalLessons + $totalQuizzes + $totalAssignments;
         $completedItems = $completedLessons + $completedQuizzes + $completedAssignments;
@@ -588,6 +598,8 @@ class EnrollmentService
             'total_assignments' => $totalAssignments,
             'completed_assignments' => $completedAssignments,
             'remaining_assignments' => max(0, $totalAssignments - $completedAssignments),
+            'passed_quiz_ids' => $passedQuizIds,
+            'approved_assignment_ids' => $approvedAssignmentIds,
             'progress' => $progress,
         ];
 
@@ -600,6 +612,8 @@ class EnrollmentService
             $result['remaining_quizzes'] = 0;
             $result['completed_assignments'] = $result['total_assignments'];
             $result['remaining_assignments'] = 0;
+            $result['passed_quiz_ids'] = $quizzes->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            $result['approved_assignment_ids'] = $assignmentIds->map(fn ($id) => (int) $id)->values()->all();
             $result['progress'] = 100;
         }
 

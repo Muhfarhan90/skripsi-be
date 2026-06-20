@@ -40,6 +40,7 @@ class QuizAttemptService
         $this->enrollmentService->assertCanWriteLearning($enrollment);
         $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, false);
         $this->assertQuizIsOpenForAttempt($quiz);
+        $this->assertQuizIsNotPassed($enrollment, $quiz);
 
         $inProgress = QuizAttempt::where('enrollment_id', $enrollmentId)
             ->where('quiz_id', $quizId)
@@ -336,6 +337,26 @@ class QuizAttemptService
 
         throw ValidationException::withMessages([
             'attempt_id' => ['Quiz time is over. Answers can no longer be changed.'],
+        ]);
+    }
+
+    private function assertQuizIsNotPassed(Enrollment $enrollment, Quiz $quiz): void
+    {
+        $attemptQuery = QuizAttempt::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->where('quiz_id', $quiz->id)
+            ->where('status', 'graded');
+
+        if ($quiz->passing_score !== null) {
+            $attemptQuery->where('total_score', '>=', (int) $quiz->passing_score);
+        }
+
+        if (! $attemptQuery->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'quiz_id' => ['Quiz is already passed for this enrollment.'],
         ]);
     }
 

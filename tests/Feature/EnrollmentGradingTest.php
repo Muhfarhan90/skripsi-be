@@ -12,9 +12,14 @@ use App\Models\QuizAttempt;
 use App\Models\Role;
 use App\Models\Section;
 use App\Models\User;
+use App\Services\AssignmentService;
 use App\Services\EnrollmentService;
+use App\Services\QuizAttemptService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
@@ -203,4 +208,47 @@ it('keeps enrollment active when no graded quiz attempt reaches passing score', 
     expect((int) $enrollment->progress)->toBe(50)
         ->and((string) $enrollment->status)->toBe('active')
         ->and($enrollment->completed_at)->toBeNull();
+});
+
+it('stores uploaded assignment files for student submissions', function () {
+    Storage::fake('public');
+    $context = createEnrollmentCompletionContext();
+
+    $submission = app(AssignmentService::class)->submitForEnrollment(
+        $context['student']->id,
+        $context['enrollment']->id,
+        $context['assignment']->id,
+        [
+            'attachment_file' => UploadedFile::fake()->create('jawaban.pdf', 256, 'application/pdf'),
+        ],
+    );
+
+    expect($submission->attachment_url)->toStartWith('/storage/assignment-submissions/');
+
+    Storage::disk('public')->assertExists(str_replace('/storage/', '', (string) $submission->attachment_url));
+});
+
+it('prevents starting a new quiz attempt after the student has passed the quiz', function () {
+    $context = createEnrollmentCompletionContext();
+
+    QuizAttempt::create([
+        'enrollment_id' => $context['enrollment']->id,
+        'quiz_id' => $context['quiz']->id,
+        'total_score' => 80,
+        'status' => 'graded',
+        'started_at' => now()->subHours(2),
+        'submitted_at' => now()->subHour(),
+    ]);
+
+    try {
+        app(QuizAttemptService::class)->startAttemptForUser(
+            $context['student']->id,
+            $context['enrollment']->id,
+            $context['quiz']->id,
+        );
+
+        $this->fail('Expected passed quiz to reject new attempts.');
+    } catch (ValidationException $exception) {
+        expect($exception->errors()['quiz_id'][0] ?? null)->toBe('Quiz is already passed for this enrollment.');
+    }
 });

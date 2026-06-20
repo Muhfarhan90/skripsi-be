@@ -16,6 +16,7 @@ class SubmitAssignmentRequest extends FormRequest
         return [
             'submission_text' => ['nullable', 'string'],
             'attachment_url' => ['nullable', 'string', 'max:2048'],
+            'attachment_file' => ['nullable', 'file', 'max:10240'],
         ];
     }
 }
