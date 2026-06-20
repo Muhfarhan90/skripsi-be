@@ -10,7 +10,20 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 trait LogsAdminActivity
 {
-    use LogsActivity;
+    use LogsActivity {
+        shouldLogEvent as parentShouldLogEvent;
+    }
+
+    public function shouldLogEvent(string $eventName): bool
+    {
+        $causer = CauserResolver::resolve() ?? request()?->user();
+
+        if ($causer instanceof \App\Models\User && $causer->role?->name === 'user') {
+            return false;
+        }
+
+        return $this->parentShouldLogEvent($eventName);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
