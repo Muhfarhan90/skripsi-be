@@ -10,6 +10,7 @@ use App\Models\Lesson;
 use App\Models\LessonProgress;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
+use App\Models\Section;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -218,6 +219,7 @@ class EnrollmentService
     {
         $enrollment = $this->findByIdForUser($userId, $enrollmentId);
         $this->assertCanReadMaterial($enrollment);
+        $this->assertQuizUnlockedForEnrollment($enrollment, $quizId);
         $courseId = $this->resolveCourseId($enrollment);
 
         $quiz = Quiz::query()
@@ -415,39 +417,17 @@ class EnrollmentService
 
     public function assertLessonUnlockedForEnrollment(Enrollment $enrollment, int $lessonId): void
     {
-        $orderedLessonIds = $this->getOrderedLessonIdsForEnrollment($enrollment);
-        $targetIndex = array_search($lessonId, $orderedLessonIds, true);
+        $this->assertItemUnlockedForEnrollment($enrollment, 'lesson', $lessonId);
+    }
 
-        if ($targetIndex === false) {
-            if ($this->lessonBelongsToEnrollmentCourse($enrollment, $lessonId)) {
-                return;
-            }
+    public function assertQuizUnlockedForEnrollment(Enrollment $enrollment, int $quizId): void
+    {
+        $this->assertItemUnlockedForEnrollment($enrollment, 'quiz', $quizId);
+    }
 
-            throw ValidationException::withMessages([
-                'lesson_id' => ['Lesson does not belong to the enrolled course'],
-            ]);
-        }
-
-        if ($targetIndex === 0) {
-            return;
-        }
-
-        $previousLessonIds = array_slice($orderedLessonIds, 0, $targetIndex);
-        $completedLessonIds = LessonProgress::query()
-            ->where('enrollment_id', $enrollment->id)
-            ->whereIn('lesson_id', $previousLessonIds)
-            ->whereNotNull('completed_at')
-            ->pluck('lesson_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if (count(array_diff($previousLessonIds, $completedLessonIds)) === 0) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'lesson_id' => ['Selesaikan lesson sebelumnya terlebih dahulu.'],
-        ]);
+    public function assertAssignmentUnlockedForEnrollment(Enrollment $enrollment, int $assignmentId): void
+    {
+        $this->assertItemUnlockedForEnrollment($enrollment, 'assignment', $assignmentId);
     }
 
     public function canReadMaterial(Enrollment $enrollment): bool
@@ -910,5 +890,149 @@ class EnrollmentService
         }
 
         return $normalized;
+    }
+
+    public function getOrderedLearningContentsForEnrollment(Enrollment $enrollment): array
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+        
+        $sections = Section::query()
+            ->where('course_id', $courseId)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+            
+        $contents = [];
+        
+        foreach ($sections as $section) {
+            // Lessons in section
+            $lessons = Lesson::query()
+                ->where('section_id', $section->id)
+                ->where('status', 'published')
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get();
+                
+            foreach ($lessons as $lesson) {
+                $contents[] = [
+                    'type' => 'lesson',
+                    'id' => (int) $lesson->id,
+                ];
+            }
+            
+            // Quizzes in section
+            $quizzes = Quiz::query()
+                ->where('section_id', $section->id)
+                ->where('is_active', true)
+                ->orderByDesc('id')
+                ->get();
+                
+            foreach ($quizzes as $quiz) {
+                $contents[] = [
+                    'type' => 'quiz',
+                    'id' => (int) $quiz->id,
+                ];
+            }
+            
+            // Assignments in section
+            $assignments = Assignment::query()
+                ->where('section_id', $section->id)
+                ->where('status', 'published')
+                ->orderBy('due_at')
+                ->orderBy('id')
+                ->get();
+                
+            foreach ($assignments as $assignment) {
+                $contents[] = [
+                    'type' => 'assignment',
+                    'id' => (int) $assignment->id,
+                ];
+            }
+        }
+        
+        return $contents;
+    }
+
+    public function assertItemUnlockedForEnrollment(Enrollment $enrollment, string $type, int $itemId): void
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+
+        // 1. Get all completed item IDs
+        $completedLessonIds = LessonProgress::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->whereNotNull('completed_at')
+            ->pluck('lesson_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $passedQuizIds = QuizAttempt::query()
+            ->join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quiz_id')
+            ->where('quiz_attempts.enrollment_id', $enrollment->id)
+            ->where('quiz_attempts.status', 'graded')
+            ->where(function ($query) {
+                $query->whereNull('quizzes.passing_score')
+                      ->orWhereRaw('quiz_attempts.total_score >= quizzes.passing_score');
+            })
+            ->pluck('quiz_attempts.quiz_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $approvedAssignmentIds = AssignmentSubmission::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->where('status', 'approved')
+            ->pluck('assignment_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        // 2. Get ordered learning contents
+        $orderedItems = $this->getOrderedLearningContentsForEnrollment($enrollment);
+
+        // 3. Find the target item in the sequence
+        $targetIndex = -1;
+        foreach ($orderedItems as $index => $item) {
+            if ($item['type'] === $type && $item['id'] === $itemId) {
+                $targetIndex = $index;
+                break;
+            }
+        }
+
+        if ($targetIndex === -1) {
+            // If the item is not part of the sequential curriculum (e.g. has no section),
+            // we treat it as unlocked by default to allow access/testing.
+            return;
+        }
+
+        if ($targetIndex === 0) {
+            return; // First item is always unlocked
+        }
+
+        // 4. Check if all preceding items are completed
+        $precedingItems = array_slice($orderedItems, 0, $targetIndex);
+
+        foreach ($precedingItems as $item) {
+            if ($item['type'] === 'lesson') {
+                if (!in_array($item['id'], $completedLessonIds, true)) {
+                    throw ValidationException::withMessages([
+                        'lesson_id' => ['Selesaikan lesson sebelumnya terlebih dahulu.'],
+                    ]);
+                }
+            } elseif ($item['type'] === 'quiz') {
+                if (!in_array($item['id'], $passedQuizIds, true)) {
+                    throw ValidationException::withMessages([
+                        'quiz_id' => ['Selesaikan kuis sebelumnya terlebih dahulu.'],
+                    ]);
+                }
+            } elseif ($item['type'] === 'assignment') {
+                if (!in_array($item['id'], $approvedAssignmentIds, true)) {
+                    throw ValidationException::withMessages([
+                        'assignment_id' => ['Selesaikan tugas sebelumnya terlebih dahulu.'],
+                    ]);
+                }
+            }
+        }
     }
 }

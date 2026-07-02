@@ -214,6 +214,16 @@ it('stores uploaded assignment files for student submissions', function () {
     Storage::fake('public');
     $context = createEnrollmentCompletionContext();
 
+    // Complete the preceding quiz to unlock the assignment
+    QuizAttempt::create([
+        'enrollment_id' => $context['enrollment']->id,
+        'quiz_id' => $context['quiz']->id,
+        'total_score' => 80,
+        'status' => 'graded',
+        'started_at' => now()->subHours(2),
+        'submitted_at' => now()->subHour(),
+    ]);
+
     $submission = app(AssignmentService::class)->submitForEnrollment(
         $context['student']->id,
         $context['enrollment']->id,

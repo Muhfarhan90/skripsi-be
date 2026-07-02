@@ -26,6 +26,7 @@ class QuizAttemptService
     {
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
         $this->enrollmentService->assertCanReadMaterial($enrollment);
+        $this->enrollmentService->assertQuizUnlockedForEnrollment($enrollment, $quizId);
         $this->findQuizForEnrollment($enrollmentId, $quizId, true);
 
         return QuizAttempt::where('enrollment_id', $enrollmentId)
@@ -38,6 +39,7 @@ class QuizAttemptService
     {
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
         $this->enrollmentService->assertCanWriteLearning($enrollment);
+        $this->enrollmentService->assertQuizUnlockedForEnrollment($enrollment, $quizId);
         $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, false);
         $this->assertQuizIsOpenForAttempt($quiz);
         $this->assertQuizIsNotPassed($enrollment, $quiz);
@@ -85,6 +87,7 @@ class QuizAttemptService
     {
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
         $this->enrollmentService->assertCanReadMaterial($enrollment);
+        $this->enrollmentService->assertQuizUnlockedForEnrollment($enrollment, $quizId);
         $this->findQuizForEnrollment($enrollmentId, $quizId, true);
 
         return QuizAttempt::with('answers')

@@ -58,6 +58,7 @@ class AssignmentService
     public function getAssignmentDetailForEnrollment(int $userId, int $enrollmentId, int $assignmentId): array
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
+        app(\App\Services\EnrollmentService::class)->assertAssignmentUnlockedForEnrollment($enrollment, $assignmentId);
         $courseId = $this->resolveCourseId($enrollment);
         $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
 
@@ -89,6 +90,7 @@ class AssignmentService
     public function submitForEnrollment(int $userId, int $enrollmentId, int $assignmentId, array $data): AssignmentSubmission
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
+        app(\App\Services\EnrollmentService::class)->assertAssignmentUnlockedForEnrollment($enrollment, $assignmentId);
         $courseId = $this->resolveCourseId($enrollment);
         $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
 
