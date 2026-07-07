@@ -10,6 +10,8 @@ use App\Models\Lesson;
 use App\Models\LessonProgress;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
+use App\Models\Question;
+use App\Models\QuizAnswer;
 use App\Models\Section;
 use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -222,17 +224,40 @@ class EnrollmentService
         $this->assertQuizUnlockedForEnrollment($enrollment, $quizId);
         $courseId = $this->resolveCourseId($enrollment);
 
+        $attempt = QuizAttempt::where('enrollment_id', $enrollment->id)
+            ->where('quiz_id', $quizId)
+            ->latest('id')
+            ->first();
+
         $quiz = Quiz::query()
-            ->with([
-                'questions' => fn ($query) => $query
-                    ->where('is_active', true)
-                    ->orderBy('sort_order')
-                    ->orderBy('id'),
-                'questions.options' => fn ($query) => $query->orderBy('id'),
-            ])
             ->where('id', $quizId)
             ->where('course_id', $courseId)
             ->firstOrFail();
+
+        if ($attempt && QuizAnswer::where('attempt_id', $attempt->id)->exists()) {
+            $answers = QuizAnswer::where('attempt_id', $attempt->id)
+                ->orderBy('id')
+                ->get();
+            
+            $questionIds = $answers->pluck('question_id')->all();
+            
+            $questions = Question::with(['options' => fn ($query) => $query->orderBy('id')])
+                ->whereIn('id', $questionIds)
+                ->get()
+                ->sortBy(fn ($q) => array_search($q->id, $questionIds))
+                ->values();
+                
+            $quiz->setRelation('questions', $questions);
+        } else {
+            $questions = Question::with(['options' => fn ($query) => $query->orderBy('id')])
+                ->where('quiz_id', $quizId)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get();
+                
+            $quiz->setRelation('questions', $questions);
+        }
 
         $unsupportedQuestionTypes = $quiz->questions
             ->pluck('type')

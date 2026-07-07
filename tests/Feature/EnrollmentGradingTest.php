@@ -262,3 +262,53 @@ it('prevents starting a new quiz attempt after the student has passed the quiz',
         expect($exception->errors()['quiz_id'][0] ?? null)->toBe('Quiz is already passed for this enrollment.');
     }
 });
+
+it('randomizes and limits quiz questions per attempt', function () {
+    $context = createEnrollmentCompletionContext();
+    $quiz = $context['quiz'];
+
+    // Update quiz to be randomized and limited to 2 questions
+    $quiz->update([
+        'is_random' => true,
+        'question_limit' => 2,
+    ]);
+
+    // Create 5 questions for this quiz
+    for ($i = 1; $i <= 5; $i++) {
+        \App\Models\Question::create([
+            'quiz_id' => $quiz->id,
+            'question_text' => "Question {$i}",
+            'type' => 'multiple_choice',
+            'score' => 20,
+            'sort_order' => $i,
+            'is_active' => true,
+        ]);
+    }
+
+    // Start an attempt
+    $attempt = app(QuizAttemptService::class)->startAttemptForUser(
+        $context['student']->id,
+        $context['enrollment']->id,
+        $quiz->id
+    );
+
+    // Verify that exactly 2 quiz answers were seeded (display limit = 2)
+    $seededAnswers = \App\Models\QuizAnswer::where('attempt_id', $attempt->id)->get();
+    expect($seededAnswers->count())->toBe(2);
+
+    // Verify that the questions fetched via student quiz detail matches the seeded questions and order
+    $detail = app(EnrollmentService::class)->findQuizDetailForUser(
+        $context['student']->id,
+        $context['enrollment']->id,
+        $quiz->id
+    );
+
+    $loadedQuestions = $detail['quiz']->questions;
+    expect($loadedQuestions->count())->toBe(2);
+
+    $seededQuestionIds = $seededAnswers->pluck('question_id')->all();
+    $loadedQuestionIds = $loadedQuestions->pluck('id')->all();
+
+    // Verify that the order matches the answers table exactly
+    expect($loadedQuestionIds)->toBe($seededQuestionIds);
+});

@@ -28,6 +28,7 @@ class StudentQuizDetailResource extends JsonResource
             'weight' => $this->weight,
             'is_active' => $this->is_active,
             'is_random' => $this->is_random,
+            'question_limit' => $this->question_limit,
             'max_attempts' => $this->max_attempts,
             'open_at' => $this->open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'close_at' => $this->close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),

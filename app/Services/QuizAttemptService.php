@@ -74,13 +74,38 @@ class QuizAttemptService
             ]);
         }
 
-        return QuizAttempt::create([
+        $attempt = QuizAttempt::create([
             'enrollment_id' => $enrollment->id,
             'quiz_id' => $quiz->id,
             'status' => 'in_progress',
             'total_score' => 0,
             'started_at' => now(),
         ]);
+
+        $questions = Question::where('quiz_id', $quiz->id)
+            ->where('is_active', true)
+            ->get();
+
+        if ($quiz->is_random) {
+            $questions = $questions->shuffle();
+        }
+
+        if ($quiz->question_limit && $quiz->question_limit > 0) {
+            $questions = $questions->take($quiz->question_limit);
+        }
+
+        foreach ($questions as $question) {
+            QuizAnswer::create([
+                'attempt_id' => $attempt->id,
+                'question_id' => $question->id,
+                'selected_option_id' => null,
+                'answer_text' => null,
+                'is_correct' => null,
+                'score' => 0,
+            ]);
+        }
+
+        return $attempt;
     }
 
     public function findAttemptForUser(int $userId, int $enrollmentId, int $quizId, int $attemptId): QuizAttempt

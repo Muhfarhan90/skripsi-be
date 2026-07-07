@@ -20,6 +20,7 @@ class Quiz extends Model
         'weight',
         'is_active',
         'is_random',
+        'question_limit',
         'max_attempts',
         'open_at',
         'close_at',
@@ -30,6 +31,7 @@ class Quiz extends Model
         'close_at' => 'datetime',
         'is_active' => 'boolean',
         'is_random' => 'boolean',
+        'question_limit' => 'integer',
     ];
 
     public function course()

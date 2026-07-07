@@ -24,6 +24,7 @@ use Illuminate\Foundation\Http\FormRequest;
             'weight' => ['nullable', 'integer'],
             'is_active' => ['nullable', 'boolean'],
             'is_random' => ['nullable', 'boolean'],
+            'question_limit' => ['nullable', 'integer', 'min:1'],
             'max_attempts' => ['nullable', 'integer'],
             'open_at' => ['nullable', 'date'],
             'close_at' => ['nullable', 'date'],
