@@ -22,4 +22,5 @@ docs {
   URI: api/enrollments/{id}/curriculum
   Action: App\Http\Controllers\Api\EnrollmentController@curriculum
   Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+  Response Notes: Section dan item lesson/quiz/assignment dapat membawa flag is_supplemental, counts_toward_progress, counts_toward_certificate, source, is_locked, is_new, dan is_completed.
 }

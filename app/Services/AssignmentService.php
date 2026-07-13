@@ -16,37 +16,27 @@ use Illuminate\Validation\ValidationException;
 class AssignmentService
 {
     public function __construct(
-        private readonly NotificationService $notificationService
+        private readonly NotificationService $notificationService,
+        private readonly CourseSnapshotService $courseSnapshotService
     ) {}
 
     public function getAssignmentsForEnrollment(int $userId, int $enrollmentId): array
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
-        $courseId = $this->resolveCourseId($enrollment);
-        $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
+        $assignments = $this->getVisibleAssignmentsForEnrollment($enrollment)
+            ->map(function (Assignment $assignment) use ($enrollment): Assignment {
+                $submissions = AssignmentSubmission::query()
+                    ->where('assignment_id', (int) $assignment->id)
+                    ->where('enrollment_id', $enrollment->id)
+                    ->with('reviewer:id,fullname')
+                    ->orderByDesc('attempt_no')
+                    ->get();
 
-        $assignments = Assignment::query()
-            ->where('course_id', $courseId)
-            ->when(
-                $snapshotAssignmentIds !== null,
-                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
-                fn ($query) => $query->where('status', 'published')
-            )
-            ->with([
-                'section:id,course_id,title',
-                'submissions' => function ($query) use ($enrollment) {
-                    $query->where('enrollment_id', $enrollment->id)
-                        ->with('reviewer:id,fullname');
-                },
-            ])
-            ->orderBy('due_at')
-            ->orderBy('id')
-            ->get();
+                $assignment->setRelation('latestSubmission', $submissions->first());
 
-        $assignments->each(function (Assignment $assignment): void {
-            $assignment->setRelation('latestSubmission', $assignment->submissions->sortByDesc('attempt_no')->first());
-            $assignment->unsetRelation('submissions');
-        });
+                return $assignment;
+            })
+            ->values();
 
         return [
             'enrollment' => $enrollment,
@@ -59,26 +49,21 @@ class AssignmentService
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
         app(\App\Services\EnrollmentService::class)->assertAssignmentUnlockedForEnrollment($enrollment, $assignmentId);
-        $courseId = $this->resolveCourseId($enrollment);
-        $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
+        $assignment = app(\App\Services\EnrollmentService::class)->findVisibleAssignmentForEnrollment($enrollment, $assignmentId);
+        if (! $assignment) {
+            throw ValidationException::withMessages([
+                'assignment_id' => ['Assignment tidak tersedia untuk enrollment ini.'],
+            ]);
+        }
 
-        $assignment = Assignment::query()
-            ->where('id', $assignmentId)
-            ->where('course_id', $courseId)
-            ->when(
-                $snapshotAssignmentIds !== null,
-                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
-                fn ($query) => $query->where('status', 'published')
-            )
-            ->with([
-                'section:id,course_id,title',
-                'submissions' => function ($query) use ($enrollment) {
-                    $query->where('enrollment_id', $enrollment->id)
-                        ->with('reviewer:id,fullname')
-                        ->orderByDesc('attempt_no');
-                },
-            ])
-            ->firstOrFail();
+        $submissions = AssignmentSubmission::query()
+            ->where('assignment_id', $assignmentId)
+            ->where('enrollment_id', $enrollment->id)
+            ->with('reviewer:id,fullname')
+            ->orderByDesc('attempt_no')
+            ->get();
+        $assignment->setRelation('submissions', $submissions);
+        $assignment->setRelation('latestSubmission', $submissions->first());
 
         return [
             'enrollment' => $enrollment,
@@ -91,18 +76,13 @@ class AssignmentService
     {
         $enrollment = Enrollment::with('courseOffering')->where('user_id', $userId)->findOrFail($enrollmentId);
         app(\App\Services\EnrollmentService::class)->assertAssignmentUnlockedForEnrollment($enrollment, $assignmentId);
-        $courseId = $this->resolveCourseId($enrollment);
-        $snapshotAssignmentIds = $this->getSnapshotIds($enrollment, 'assignment_ids');
-
-        $assignment = Assignment::query()
-            ->where('id', $assignmentId)
-            ->where('course_id', $courseId)
-            ->when(
-                $snapshotAssignmentIds !== null,
-                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
-                fn ($query) => $query->where('status', 'published')
-            )
-            ->firstOrFail();
+        $assignment = app(\App\Services\EnrollmentService::class)->findVisibleAssignmentForEnrollment($enrollment, $assignmentId);
+        if (! $assignment) {
+            throw ValidationException::withMessages([
+                'assignment_id' => ['Assignment tidak tersedia untuk enrollment ini.'],
+            ]);
+        }
+        $assignmentSnapshot = $this->resolveSubmissionAssignmentSnapshot($enrollment, $assignment);
 
         $this->assertStudentCanSubmit($enrollment, $assignment);
 
@@ -155,12 +135,13 @@ class AssignmentService
         $attemptNo = ($latest?->attempt_no ?? 0) + 1;
 
         $submission = AssignmentSubmission::create([
-            'assignment_id' => $assignment->id,
+            'assignment_id' => (int) $assignmentSnapshot['id'],
             'enrollment_id' => $enrollment->id,
             'user_id' => $enrollment->user_id,
             'attempt_no' => $attemptNo,
             'submission_text' => $submissionText,
             'attachment_url' => $attachmentUrl,
+            'assignment_snapshot' => $assignmentSnapshot,
             'status' => 'submitted',
             'review_notes' => null,
             'reviewed_by' => null,
@@ -198,7 +179,6 @@ class AssignmentService
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'instructions' => $data['instructions'] ?? null,
-            'due_at' => $data['due_at'] ?? null,
             'is_required_for_certificate' => $data['is_required_for_certificate'] ?? true,
             'allow_resubmission' => $data['allow_resubmission'] ?? true,
             'max_attempts' => $data['max_attempts'] ?? null,
@@ -396,6 +376,106 @@ class AssignmentService
             ->all();
     }
 
+    /**
+     * @return \Illuminate\Support\Collection<int, Assignment>
+     */
+    private function getVisibleAssignmentsForEnrollment(Enrollment $enrollment): \Illuminate\Support\Collection
+    {
+        $course = app(\App\Services\EnrollmentService::class)->getVisibleCurriculumCourseForEnrollment($enrollment);
+
+        return $course->sections
+            ->flatMap(function (Section $section) {
+                return $section->assignments
+                    ->map(function (Assignment $assignment) use ($section): Assignment {
+                        $assignment->setRelation('section', $section);
+
+                        return $assignment;
+                    });
+            })
+            ->values();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function getAssignmentSnapshotsForEnrollment(Enrollment $enrollment): array
+    {
+        $snapshot = app(EnrollmentService::class)->getSnapshotForEnrollment($enrollment);
+        $assignmentSnapshots = [];
+
+        foreach ($snapshot['sections'] ?? [] as $section) {
+            foreach ($section['assignments'] ?? [] as $assignment) {
+                if (! is_array($assignment)) {
+                    continue;
+                }
+
+                $assignmentSnapshots[] = array_merge($assignment, [
+                    'section_title' => $section['title'] ?? null,
+                ]);
+            }
+        }
+
+        return $assignmentSnapshots;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveAssignmentSnapshotForEnrollment(Enrollment $enrollment, int $assignmentId): array
+    {
+        $snapshot = app(EnrollmentService::class)->getSnapshotForEnrollment($enrollment);
+
+        foreach ($snapshot['sections'] ?? [] as $section) {
+            foreach ($section['assignments'] ?? [] as $assignment) {
+                if ((int) ($assignment['id'] ?? 0) !== $assignmentId) {
+                    continue;
+                }
+
+                return array_merge($assignment, [
+                    'section_title' => $section['title'] ?? null,
+                ]);
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'assignment_id' => ['Assignment tidak ditemukan pada snapshot enrollment ini.'],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveSubmissionAssignmentSnapshot(Enrollment $enrollment, Assignment $assignment): array
+    {
+        $snapshot = app(\App\Services\EnrollmentService::class)->findAssignmentSnapshotForEnrollment($enrollment, (int) $assignment->id);
+
+        if ($snapshot !== null) {
+            return $snapshot;
+        }
+
+        return $this->courseSnapshotService->makeAssignmentSnapshotFromModel($assignment);
+    }
+
+    private function makeAssignmentModelWithSnapshotRelations(array $assignmentSnapshot): Assignment
+    {
+        $assignment = $this->courseSnapshotService->makeAssignmentModel($assignmentSnapshot);
+
+        if (isset($assignmentSnapshot['section_id']) && $assignmentSnapshot['section_id']) {
+            $assignment->setRelation('section', new Section([
+                'id' => (int) $assignmentSnapshot['section_id'],
+                'course_id' => $assignmentSnapshot['course_id'] ?? null,
+                'title' => $this->resolveSectionTitleFromSnapshot($assignmentSnapshot),
+            ]));
+        }
+
+        return $assignment;
+    }
+
+    private function resolveSectionTitleFromSnapshot(array $assignmentSnapshot): ?string
+    {
+        return $assignmentSnapshot['section_title'] ?? null;
+    }
+
     private function resolveCourseId(Enrollment $enrollment): int
     {
         $enrollment->loadMissing('courseOffering');
@@ -488,34 +568,7 @@ class AssignmentService
 
     private function assertAssignmentUpdateAllowed(Assignment $assignment, array $data): void
     {
-        if (! $assignment->submissions()->exists()) {
-            return;
-        }
-
-        $lockedFields = [
-            'course_id',
-            'section_id',
-            'due_at',
-            'is_required_for_certificate',
-            'allow_resubmission',
-            'max_attempts',
-            'status',
-        ];
-
-        foreach ($lockedFields as $field) {
-            if (! array_key_exists($field, $data)) {
-                continue;
-            }
-
-            $current = $assignment->{$field};
-            $incoming = $data[$field];
-
-            if ($this->normalizeComparableValue($current) !== $this->normalizeComparableValue($incoming)) {
-                throw ValidationException::withMessages([
-                    $field => ['Assignment sudah memiliki submission, field ini tidak bisa diubah. Buat assignment baru untuk perubahan syarat.'],
-                ]);
-            }
-        }
+        //
     }
 
     private function normalizeComparableValue(mixed $value): mixed

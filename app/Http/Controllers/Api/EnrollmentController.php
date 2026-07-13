@@ -52,29 +52,7 @@ class EnrollmentController extends Controller
 
     public function curriculum(Request $request, string $id)
     {
-        $enrollment = $this->service->findByIdForUser((int) $request->user()->id, (int) $id);
-        $this->service->assertCanReadMaterial($enrollment);
-        $enrollment->loadMissing('courseOffering');
-        $courseId = $enrollment->courseOffering?->course_id;
-        if (! $courseId) {
-            throw ValidationException::withMessages([
-                'course_offering_id' => ['Enrollment is missing a valid course offering reference.'],
-            ]);
-        }
-
-        $course = Course::withTrashed()
-            ->with([
-                'category:id,name',
-                'instructor:id,fullname',
-                'sections' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
-                'sections.lessons' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
-                'sections.quizzes' => fn ($query) => $query->orderByDesc('id'),
-                'sections.assignments' => fn ($query) => $query
-                    ->where('status', 'published')
-                    ->orderBy('due_at')
-                    ->orderBy('id'),
-            ])
-            ->findOrFail($courseId);
+        $course = $this->service->getCurriculumCourseForUser((int) $request->user()->id, (int) $id);
 
         return response()->json([
             'success' => true,

@@ -298,8 +298,6 @@ class CertificateDemoCourseSeeder extends Seeder
                     'is_active' => true,
                     'is_random' => false,
                     'max_attempts' => 3,
-                    'open_at' => null,
-                    'close_at' => null,
                 ]
             );
         }
@@ -484,7 +482,6 @@ class CertificateDemoCourseSeeder extends Seeder
                 'title' => 'Final Reflection Project',
                 'description' => 'Assignment akhir untuk memastikan student mampu merangkum pemahaman dasar pemrograman.',
                 'instructions' => 'Tuliskan pseudocode aplikasi kasir sederhana, jelaskan alur input-proses-output, lalu sertakan refleksi singkat tentang apa yang sudah dipahami.',
-                'due_at' => now()->addDays(30),
                 'is_required_for_certificate' => true,
                 'allow_resubmission' => true,
                 'max_attempts' => 3,

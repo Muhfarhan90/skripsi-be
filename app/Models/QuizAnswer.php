@@ -13,10 +13,12 @@ class QuizAnswer extends Model
         'answer_text',
         'is_correct',
         'score',
+        'question_snapshot',
     ];
 
     protected $casts = [
         'is_correct' => 'boolean',
+        'question_snapshot' => 'array',
     ];
 
     public function attempt()

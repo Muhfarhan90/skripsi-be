@@ -18,7 +18,6 @@ class UpdateAssignmentRequest extends FormRequest
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'instructions' => ['nullable', 'string'],
-            'due_at' => ['nullable', 'date'],
             'is_required_for_certificate' => ['nullable', 'boolean'],
             'allow_resubmission' => ['nullable', 'boolean'],
             'max_attempts' => ['nullable', 'integer', 'min:1', 'max:50'],

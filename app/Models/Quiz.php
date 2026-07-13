@@ -22,13 +22,9 @@ class Quiz extends Model
         'is_random',
         'question_limit',
         'max_attempts',
-        'open_at',
-        'close_at',
     ];
 
     protected $casts = [
-        'open_at' => 'datetime',
-        'close_at' => 'datetime',
         'is_active' => 'boolean',
         'is_random' => 'boolean',
         'question_limit' => 'integer',

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Quiz;
 use App\Models\Section;
 
 class SectionService
@@ -61,6 +62,13 @@ class SectionService
         $deletedOrder = $section->sort_order;
         $courseId = $section->course_id;
 
+        $section->lessons()->delete();
+        $section->assignments()->delete();
+
+        foreach ($section->quizzes()->get() as $quiz) {
+            $this->softDeleteQuizTree($quiz);
+        }
+
         $section->delete();
 
         // Menggeser agar tidak ada gap urutan setelah data dihapus
@@ -69,5 +77,15 @@ class SectionService
             ->decrement('sort_order');
 
         return true;
+    }
+
+    private function softDeleteQuizTree(Quiz $quiz): void
+    {
+        foreach ($quiz->questions()->get() as $question) {
+            $question->options()->delete();
+            $question->delete();
+        }
+
+        $quiz->delete();
     }
 }

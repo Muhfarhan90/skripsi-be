@@ -4,10 +4,11 @@ namespace App\Models;
 
 use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Assignment extends Model
 {
-    use LogsAdminActivity;
+    use LogsAdminActivity, SoftDeletes;
 
     protected $fillable = [
         'course_id',
@@ -16,7 +17,6 @@ class Assignment extends Model
         'title',
         'description',
         'instructions',
-        'due_at',
         'is_required_for_certificate',
         'allow_resubmission',
         'max_attempts',
@@ -24,7 +24,6 @@ class Assignment extends Model
     ];
 
     protected $casts = [
-        'due_at' => 'datetime',
         'is_required_for_certificate' => 'boolean',
         'allow_resubmission' => 'boolean',
         'max_attempts' => 'integer',

@@ -1,0 +1,49 @@
+meta {
+  name: POST quizzes.question-bank.import
+  type: http
+  seq: 166
+}
+
+post {
+  url: {{baseUrl}}/admin/quizzes/{{quizId}}/question-bank/import
+  body: json
+  auth: bearer
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "mode": "append",
+    "questions": [
+      {
+        "question_text": "2 + 2 = ?",
+        "type": "multiple_choice",
+        "is_active": true,
+        "options": [
+          {
+            "option_text": "4",
+            "is_correct": true
+          },
+          {
+            "option_text": "5",
+            "is_correct": false
+          }
+        ]
+      }
+    ]
+  }
+}
+
+docs {
+  URI: api/admin/quizzes/{quizId}/question-bank/import
+  Action: App\Http\Controllers\Api\Admin\QuestionController@importForQuiz
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}

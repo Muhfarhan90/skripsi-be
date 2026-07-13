@@ -40,8 +40,6 @@ class QuizSeeder extends Seeder
                 'is_active' => true,
                 'is_random' => false,
                 'max_attempts' => 3,
-                'open_at' => null,
-                'close_at' => null,
             ],
         ];
 

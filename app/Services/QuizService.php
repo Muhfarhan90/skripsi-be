@@ -6,7 +6,6 @@ use App\Models\Course;
 use App\Models\Quiz;
 use App\Models\QuizAttempt;
 use App\Models\Section;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -61,7 +60,6 @@ class QuizService
     {
         return DB::transaction(function () use ($courseId, $sectionId, $data) {
             $this->ensureSectionBelongsToCourse($courseId, $sectionId);
-            $this->assertQuizWindowRange($data);
 
             $quizData = array_merge($data, [
                 'course_id' => $courseId,
@@ -81,10 +79,6 @@ class QuizService
             $nextSectionId = isset($data['section_id']) ? (int) $data['section_id'] : (int) $quiz->section_id;
 
             $this->ensureSectionBelongsToCourse($nextCourseId, $nextSectionId);
-            $this->assertQuizWindowRange(array_merge([
-                'open_at' => $quiz->open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
-                'close_at' => $quiz->close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
-            ], $data));
 
             $quiz->update($data);
             return $quiz->refresh();
@@ -100,10 +94,6 @@ class QuizService
             $this->assertQuizUpdateAllowed($quiz, $data);
 
             $this->ensureSectionBelongsToCourse($courseId, $sectionId);
-            $this->assertQuizWindowRange(array_merge([
-                'open_at' => $quiz->open_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
-                'close_at' => $quiz->close_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
-            ], $data));
 
             $quiz->update(array_merge($data, [
                 'course_id' => $courseId,
@@ -164,47 +154,9 @@ class QuizService
         return $section;
     }
 
-    private function assertQuizWindowRange(array $data): void
-    {
-        $openAt = $data['open_at'] ?? null;
-        $closeAt = $data['close_at'] ?? null;
-
-        if (empty($openAt) || empty($closeAt)) {
-            return;
-        }
-
-        $open = Carbon::parse((string) $openAt);
-        $close = Carbon::parse((string) $closeAt);
-        if ($close->lt($open)) {
-            throw ValidationException::withMessages([
-                'close_at' => ['Quiz close_at must be greater than or equal to open_at.'],
-            ]);
-        }
-    }
-
     private function assertQuizUpdateAllowed(Quiz $quiz, array $data): void
     {
-        if (! QuizAttempt::where('quiz_id', $quiz->id)->exists()) {
-            return;
-        }
-
-        $lockedFields = [
-            'course_id',
-            'section_id',
-            'passing_score',
-            'weight',
-            'is_active',
-            'is_random',
-            'max_attempts',
-        ];
-
-        foreach ($lockedFields as $field) {
-            if (array_key_exists($field, $data) && $this->normalizeComparableValue($data[$field]) !== $this->normalizeComparableValue($quiz->{$field})) {
-                throw ValidationException::withMessages([
-                    $field => ['Quiz sudah memiliki attempt, field ini tidak bisa diubah. Buat quiz baru untuk perubahan struktur evaluasi.'],
-                ]);
-            }
-        }
+        //
     }
 
     private function normalizeComparableValue(mixed $value): mixed
@@ -222,12 +174,6 @@ class QuizService
 
     private function assertQuizHasNoAttempts(Quiz $quiz): void
     {
-        if (! QuizAttempt::where('quiz_id', $quiz->id)->exists()) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'quiz' => ['Quiz tidak bisa dihapus karena sudah memiliki attempt. Nonaktifkan atau buat quiz baru sebagai pengganti.'],
-        ]);
+        //
     }
 }

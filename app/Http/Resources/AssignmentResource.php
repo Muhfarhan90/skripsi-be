@@ -17,11 +17,17 @@ class AssignmentResource extends JsonResource
             'title' => $this->title,
             'description' => $this->description,
             'instructions' => $this->instructions,
-            'due_at' => $this->due_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
             'is_required_for_certificate' => (bool) $this->is_required_for_certificate,
             'allow_resubmission' => (bool) $this->allow_resubmission,
             'max_attempts' => $this->max_attempts,
             'status' => $this->status,
+            'is_supplemental' => (bool) ($this->is_supplemental ?? false),
+            'counts_toward_progress' => (bool) ($this->counts_toward_progress ?? true),
+            'counts_toward_certificate' => (bool) ($this->counts_toward_certificate ?? true),
+            'source' => $this->source,
+            'is_locked' => (bool) ($this->is_locked ?? false),
+            'is_new' => (bool) ($this->is_new ?? false),
+            'is_completed' => (bool) ($this->is_completed ?? false),
             'section' => $this->whenLoaded('section', function () {
                 return [
                     'id' => $this->section?->id,

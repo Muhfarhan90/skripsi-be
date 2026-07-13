@@ -14,20 +14,24 @@ use App\Models\Question;
 use App\Models\QuizAnswer;
 use App\Models\Section;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class EnrollmentService
 {
     protected OrderService $orderService;
     protected AssignmentService $assignmentService;
+    protected CourseSnapshotService $courseSnapshotService;
 
     public function __construct(
         OrderService $orderService,
-        AssignmentService $assignmentService
+        AssignmentService $assignmentService,
+        CourseSnapshotService $courseSnapshotService
     )
     {
         $this->orderService = $orderService;
         $this->assignmentService = $assignmentService;
+        $this->courseSnapshotService = $courseSnapshotService;
     }
 
     public function getAllByUser(int $userId)
@@ -175,36 +179,46 @@ class EnrollmentService
     {
         $enrollment = $this->findByIdForUser($userId, $id);
         $this->assertCanReadMaterial($enrollment);
-        $courseId = $this->resolveCourseId($enrollment);
-
         $completedLessonIds = LessonProgress::where('enrollment_id', $enrollment->id)
             ->whereNotNull('completed_at')
-            ->pluck('lesson_id');
+            ->pluck('lesson_id')
+            ->map(fn ($lessonId) => (int) $lessonId)
+            ->all();
 
-        return Lesson::query()
-            ->select('lessons.*')
-            ->join('sections', 'sections.id', '=', 'lessons.section_id')
-            ->where('sections.course_id', $courseId)
-            ->whereNotIn('lessons.id', $completedLessonIds)
-            ->orderBy('sections.sort_order')
-            ->orderBy('lessons.sort_order')
-            ->orderBy('lessons.id')
-            ->first();
+        foreach ($this->getOrderedLessonIdsForEnrollment($enrollment) as $lessonId) {
+            if (in_array($lessonId, $completedLessonIds, true)) {
+                continue;
+            }
+
+            $lesson = $this->findVisibleLessonForEnrollment($enrollment, $lessonId);
+            if ($lesson !== null) {
+                return $lesson;
+            }
+        }
+
+        return null;
+    }
+
+    public function getCurriculumCourseForUser(int $userId, int $enrollmentId): Course
+    {
+        $enrollment = $this->findByIdForUser($userId, $enrollmentId);
+        $this->assertCanReadMaterial($enrollment);
+
+        return $this->getVisibleCurriculumCourseForEnrollment($enrollment);
     }
 
     public function findLessonDetailForUser(int $userId, int $enrollmentId, int $lessonId): array
     {
         $enrollment = $this->findByIdForUser($userId, $enrollmentId);
         $this->assertCanReadMaterial($enrollment);
-        $courseId = $this->resolveCourseId($enrollment);
         $this->assertLessonUnlockedForEnrollment($enrollment, $lessonId);
+        $lesson = $this->findVisibleLessonForEnrollment($enrollment, $lessonId);
 
-        $lesson = Lesson::with('section')
-            ->where('id', $lessonId)
-            ->whereHas('section', function ($query) use ($courseId) {
-                $query->where('course_id', $courseId);
-            })
-            ->firstOrFail();
+        if ($lesson === null) {
+            throw ValidationException::withMessages([
+                'lesson_id' => ['Lesson tidak tersedia untuk enrollment ini.'],
+            ]);
+        }
 
         $progress = LessonProgress::where('enrollment_id', $enrollment->id)
             ->where('lesson_id', $lesson->id)
@@ -222,41 +236,53 @@ class EnrollmentService
         $enrollment = $this->findByIdForUser($userId, $enrollmentId);
         $this->assertCanReadMaterial($enrollment);
         $this->assertQuizUnlockedForEnrollment($enrollment, $quizId);
-        $courseId = $this->resolveCourseId($enrollment);
+        $quizSnapshot = $this->findQuizSnapshotForEnrollment($enrollment, $quizId);
+        $quiz = $this->findVisibleQuizForEnrollment($enrollment, $quizId, true, true);
+
+        if ($quiz === null) {
+            throw ValidationException::withMessages([
+                'quiz_id' => ['Quiz tidak tersedia untuk enrollment ini.'],
+            ]);
+        }
 
         $attempt = QuizAttempt::where('enrollment_id', $enrollment->id)
             ->where('quiz_id', $quizId)
             ->latest('id')
             ->first();
 
-        $quiz = Quiz::query()
-            ->where('id', $quizId)
-            ->where('course_id', $courseId)
-            ->firstOrFail();
-
         if ($attempt && QuizAnswer::where('attempt_id', $attempt->id)->exists()) {
             $answers = QuizAnswer::where('attempt_id', $attempt->id)
                 ->orderBy('id')
                 ->get();
-            
-            $questionIds = $answers->pluck('question_id')->all();
-            
-            $questions = Question::with(['options' => fn ($query) => $query->orderBy('id')])
-                ->whereIn('id', $questionIds)
-                ->get()
-                ->sortBy(fn ($q) => array_search($q->id, $questionIds))
+
+            $questionSnapshots = $answers
+                ->map(function (QuizAnswer $answer) use ($quizSnapshot): ?array {
+                    if (is_array($answer->question_snapshot)) {
+                        return $answer->question_snapshot;
+                    }
+
+                    if ($quizSnapshot === null) {
+                        return null;
+                    }
+
+                    return $this->courseSnapshotService->findQuestionSnapshot($quizSnapshot, (int) $answer->question_id);
+                })
+                ->filter()
                 ->values();
-                
-            $quiz->setRelation('questions', $questions);
-        } else {
-            $questions = Question::with(['options' => fn ($query) => $query->orderBy('id')])
-                ->where('quiz_id', $quizId)
-                ->where('is_active', true)
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get();
-                
-            $quiz->setRelation('questions', $questions);
+
+            $quiz->setRelation(
+                'questions',
+                $questionSnapshots
+                    ->map(fn (array $questionSnapshot) => $this->courseSnapshotService->makeQuestionModel($questionSnapshot))
+                    ->values()
+            );
+        } elseif ($quizSnapshot !== null) {
+            $quiz->setRelation(
+                'questions',
+                collect($quizSnapshot['questions'] ?? [])
+                    ->map(fn (array $questionSnapshot) => $this->courseSnapshotService->makeQuestionModel($questionSnapshot))
+                    ->values()
+            );
         }
 
         $unsupportedQuestionTypes = $quiz->questions
@@ -512,7 +538,6 @@ class EnrollmentService
 
     private function calculateLearningProgress(Enrollment $enrollment): array
     {
-        $courseId = $this->resolveCourseId($enrollment);
         $snapshot = $this->getCompletionSnapshot($enrollment);
         $hasLessonSnapshot = array_key_exists('lesson_ids', $snapshot);
         $hasQuizSnapshot = array_key_exists('quiz_ids', $snapshot);
@@ -535,37 +560,53 @@ class EnrollmentService
             ->whereNotNull('completed_at')
             ->count();
 
-        $quizIds = collect($snapshot['quiz_ids'] ?? []);
-        $quizzes = $hasQuizSnapshot
-            ? Quiz::query()
-                ->where('course_id', $courseId)
-                ->whereIn('id', $quizIds)
-                ->get(['id', 'passing_score'])
-            : Quiz::query()
+        $quizGradeItems = collect($snapshot['quiz_grade_items'] ?? [])
+            ->filter(fn ($item) => is_array($item) && isset($item['quiz_id']))
+            ->values();
+
+        if (! $hasQuizSnapshot || $quizGradeItems->isEmpty()) {
+            $courseId = $this->resolveCourseId($enrollment);
+            $quizGradeItems = Quiz::query()
                 ->where('course_id', $courseId)
                 ->where('is_active', true)
-                ->get(['id', 'passing_score']);
+                ->get(['id', 'passing_score', 'weight'])
+                ->map(fn (Quiz $quiz) => [
+                    'quiz_id' => (int) $quiz->id,
+                    'passing_score' => $quiz->passing_score !== null ? (int) $quiz->passing_score : null,
+                    'weight' => (int) ($quiz->weight ?? 0),
+                ])
+                ->values();
+        }
 
-        $totalQuizzes = $quizzes->count();
-        $passedQuizIds = $quizzes->filter(function (Quiz $quiz) use ($enrollment): bool {
-            $attemptQuery = QuizAttempt::query()
-                ->where('enrollment_id', $enrollment->id)
-                ->where('quiz_id', $quiz->id)
-                ->where('status', 'graded');
+        $quizPassingScoreMap = $quizGradeItems
+            ->mapWithKeys(fn (array $item) => [
+                (int) $item['quiz_id'] => array_key_exists('passing_score', $item) && $item['passing_score'] !== null
+                    ? (int) $item['passing_score']
+                    : null,
+            ]);
 
-            if ($quiz->passing_score !== null) {
-                $attemptQuery->where('total_score', '>=', (int) $quiz->passing_score);
-            }
+        $quizIds = $quizPassingScoreMap->keys()->map(fn ($id) => (int) $id)->values();
+        $totalQuizzes = $quizIds->count();
+        $passedQuizIds = QuizAttempt::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->whereIn('quiz_id', $quizIds->all())
+            ->where('status', 'graded')
+            ->get(['quiz_id', 'total_score'])
+            ->filter(function (QuizAttempt $attempt) use ($quizPassingScoreMap): bool {
+                $passingScore = $quizPassingScoreMap->get((int) $attempt->quiz_id);
 
-            return $attemptQuery->exists();
-        })->pluck('id')
+                return $passingScore === null || (int) $attempt->total_score >= $passingScore;
+            })
+            ->pluck('quiz_id')
             ->map(fn ($id) => (int) $id)
+            ->unique()
             ->values()
             ->all();
         $completedQuizzes = count($passedQuizIds);
 
         $assignmentIds = collect($snapshot['assignment_ids'] ?? []);
         if (! $hasAssignmentSnapshot) {
+            $courseId = $this->resolveCourseId($enrollment);
             $assignmentIds = Assignment::query()
                 ->where('course_id', $courseId)
                 ->where('status', 'published')
@@ -617,7 +658,7 @@ class EnrollmentService
             $result['remaining_quizzes'] = 0;
             $result['completed_assignments'] = $result['total_assignments'];
             $result['remaining_assignments'] = 0;
-            $result['passed_quiz_ids'] = $quizzes->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            $result['passed_quiz_ids'] = $quizIds->map(fn ($id) => (int) $id)->values()->all();
             $result['approved_assignment_ids'] = $assignmentIds->map(fn ($id) => (int) $id)->values()->all();
             $result['progress'] = 100;
         }
@@ -639,7 +680,6 @@ class EnrollmentService
 
     private function getOrderedLessonIdsForEnrollment(Enrollment $enrollment): array
     {
-        $courseId = $this->resolveCourseId($enrollment);
         $snapshot = $this->getCompletionSnapshot($enrollment);
         $snapshotLessonIds = collect($snapshot['lesson_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
@@ -649,6 +689,7 @@ class EnrollmentService
             return $snapshotLessonIds;
         }
 
+        $courseId = $this->resolveCourseId($enrollment);
         return Lesson::query()
             ->select('lessons.id')
             ->join('sections', 'sections.id', '=', 'lessons.section_id')
@@ -665,12 +706,16 @@ class EnrollmentService
 
     private function lessonBelongsToEnrollmentCourse(Enrollment $enrollment, int $lessonId): bool
     {
+        if ($this->findLessonSnapshotForEnrollment($enrollment, $lessonId) !== null) {
+            return true;
+        }
+
         $courseId = $this->resolveCourseId($enrollment);
 
-        return Lesson::query()
+        return Lesson::withTrashed()
             ->where('id', $lessonId)
             ->whereHas('section', function ($query) use ($courseId) {
-                $query->where('course_id', $courseId);
+                $query->withTrashed()->where('course_id', $courseId);
             })
             ->exists();
     }
@@ -734,125 +779,12 @@ class EnrollmentService
         $courseId = $this->resolveCourseId($enrollment);
         Course::withTrashed()->select(['id'])->findOrFail($courseId);
         $enrollment->loadMissing('courseOffering');
-        $snapshotLessonIds = $this->normalizeSnapshotIdList($existingSnapshot['lesson_ids'] ?? null);
-        $lessonIds = $snapshotLessonIds
-            ?? Lesson::query()
-                ->select('lessons.id')
-                ->join('sections', 'sections.id', '=', 'lessons.section_id')
-                ->where('sections.course_id', $courseId)
-                ->where('lessons.status', 'published')
-                ->orderBy('sections.sort_order')
-                ->orderBy('sections.id')
-                ->orderBy('lessons.sort_order')
-                ->orderBy('lessons.id')
-                ->pluck('lessons.id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
 
-        $snapshotQuizIds = $this->normalizeSnapshotIdList($existingSnapshot['quiz_ids'] ?? null);
-        $quizQuery = Quiz::query()
-            ->where('course_id', $courseId);
-
-        if ($snapshotQuizIds !== null) {
-            $quizQuery->whereIn('id', $snapshotQuizIds);
-        } else {
-            $quizQuery->where('is_active', true);
-        }
-
-        $quizzes = $quizQuery
-            ->orderBy('id')
-            ->get(['id', 'passing_score', 'weight'])
-            ->keyBy('id');
-
-        $quizIds = $snapshotQuizIds !== null
-            ? collect($snapshotQuizIds)
-                ->filter(fn ($quizId) => $quizzes->has($quizId))
-                ->values()
-                ->all()
-            : $quizzes->keys()->map(fn ($id) => (int) $id)->values()->all();
-
-        $snapshotAssignmentIds = $this->normalizeSnapshotIdList($existingSnapshot['assignment_ids'] ?? null);
-        $assignmentQuery = Assignment::query()
-            ->where('course_id', $courseId)
-            ->when(
-                $snapshotAssignmentIds !== null,
-                fn ($query) => $query->whereIn('id', $snapshotAssignmentIds),
-                fn ($query) => $query->where('status', 'published')
-            );
-
-        $assignments = $assignmentQuery
-            ->orderBy('due_at')
-            ->orderBy('id')
-            ->get([
-                'id',
-                'is_required_for_certificate',
-            ])
-            ->keyBy('id');
-
-        $assignmentIds = $snapshotAssignmentIds !== null
-            ? collect($snapshotAssignmentIds)
-                ->filter(fn ($assignmentId) => $assignments->has($assignmentId))
-                ->values()
-                ->all()
-            : $assignments->keys()->map(fn ($id) => (int) $id)->values()->all();
-
-        $snapshotRequiredAssignmentIds = $this->normalizeSnapshotIdList($existingSnapshot['required_assignment_ids'] ?? null);
-        $requiredAssignmentIds = $snapshotRequiredAssignmentIds !== null
-            ? collect($snapshotRequiredAssignmentIds)
-                ->filter(fn ($assignmentId) => in_array($assignmentId, $assignmentIds, true))
-                ->values()
-                ->all()
-            : collect($assignmentIds)
-                ->filter(fn ($assignmentId) => (bool) optional($assignments->get($assignmentId))->is_required_for_certificate)
-                ->values()
-                ->all();
-
-        $quizGradeItems = collect($quizIds)
-            ->map(function (int $quizId) use ($quizzes): ?array {
-                $quiz = $quizzes->get($quizId);
-
-                if (! $quiz) {
-                    return null;
-                }
-
-                return [
-                    'quiz_id' => (int) $quiz->id,
-                    'weight' => (int) ($quiz->weight ?? 0),
-                    'passing_score' => $quiz->passing_score !== null ? (int) $quiz->passing_score : null,
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
-
-        $assignmentGradeItems = collect($assignmentIds)
-            ->map(function (int $assignmentId) use ($assignments): ?array {
-                $assignment = $assignments->get($assignmentId);
-
-                if (! $assignment) {
-                    return null;
-                }
-
-                return [
-                    'assignment_id' => (int) $assignment->id,
-                    'is_required_for_certificate' => (bool) $assignment->is_required_for_certificate,
-                ];
-            })
-            ->filter()
-            ->values()
-            ->all();
-
-        return [
-            'course_id' => $courseId,
-            'course_offering_id' => $enrollment->courseOffering?->id,
-            'lesson_ids' => $lessonIds,
-            'quiz_ids' => $quizIds,
-            'assignment_ids' => $assignmentIds,
-            'required_assignment_ids' => $requiredAssignmentIds,
-            'quiz_grade_items' => $quizGradeItems,
-            'assignment_grade_items' => $assignmentGradeItems,
-            'snapshot_at' => $existingSnapshot['snapshot_at'] ?? now()->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
-        ];
+        return $this->courseSnapshotService->buildForCourseId(
+            $courseId,
+            $enrollment->courseOffering?->id ? (int) $enrollment->courseOffering->id : null,
+            $existingSnapshot,
+        );
     }
 
     private function assertCompletionRequirementSatisfied(Enrollment $enrollment): void
@@ -877,112 +809,44 @@ class EnrollmentService
 
     private function completionSnapshotNeedsRefresh(?array $snapshot): bool
     {
-        if (! is_array($snapshot)) {
-            return true;
-        }
-
-        return ! isset(
-            $snapshot['course_id'],
-            $snapshot['course_offering_id'],
-            $snapshot['lesson_ids'],
-            $snapshot['quiz_ids'],
-            $snapshot['assignment_ids'],
-            $snapshot['required_assignment_ids'],
-            $snapshot['quiz_grade_items'],
-            $snapshot['assignment_grade_items'],
-            $snapshot['snapshot_at'],
-        )
-            || ! is_array($snapshot['quiz_grade_items'])
-            || ! is_array($snapshot['assignment_grade_items']);
+        return $this->courseSnapshotService->needsRefresh($snapshot);
     }
 
     private function normalizeSnapshotIdList(mixed $value): ?array
     {
-        if (! is_array($value)) {
-            return null;
-        }
-
-        $normalized = [];
-
-        foreach ($value as $id) {
-            $normalizedId = (int) $id;
-
-            if ($normalizedId <= 0 || in_array($normalizedId, $normalized, true)) {
-                continue;
-            }
-
-            $normalized[] = $normalizedId;
-        }
-
-        return $normalized;
+        return $this->courseSnapshotService->normalizeIdList($value);
     }
 
     public function getOrderedLearningContentsForEnrollment(Enrollment $enrollment): array
     {
-        $courseId = $this->resolveCourseId($enrollment);
-        
-        $sections = Section::query()
-            ->where('course_id', $courseId)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
-            
-        $contents = [];
-        
-        foreach ($sections as $section) {
-            // Lessons in section
-            $lessons = Lesson::query()
-                ->where('section_id', $section->id)
-                ->where('status', 'published')
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get();
-                
-            foreach ($lessons as $lesson) {
-                $contents[] = [
-                    'type' => 'lesson',
-                    'id' => (int) $lesson->id,
-                ];
-            }
-            
-            // Quizzes in section
-            $quizzes = Quiz::query()
-                ->where('section_id', $section->id)
-                ->where('is_active', true)
-                ->orderByDesc('id')
-                ->get();
-                
-            foreach ($quizzes as $quiz) {
-                $contents[] = [
-                    'type' => 'quiz',
-                    'id' => (int) $quiz->id,
-                ];
-            }
-            
-            // Assignments in section
-            $assignments = Assignment::query()
-                ->where('section_id', $section->id)
-                ->where('status', 'published')
-                ->orderBy('due_at')
-                ->orderBy('id')
-                ->get();
-                
-            foreach ($assignments as $assignment) {
-                $contents[] = [
-                    'type' => 'assignment',
-                    'id' => (int) $assignment->id,
-                ];
-            }
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+
+        if (is_array($snapshot['ordered_items'] ?? null)) {
+            return collect($snapshot['ordered_items'])
+                ->filter(fn ($item) => is_array($item) && isset($item['type'], $item['id']))
+                ->map(fn (array $item) => [
+                    'type' => (string) $item['type'],
+                    'id' => (int) $item['id'],
+                    'section_id' => isset($item['section_id']) ? (int) $item['section_id'] : null,
+                ])
+                ->values()
+                ->all();
         }
-        
-        return $contents;
+
+        return [];
     }
 
     public function assertItemUnlockedForEnrollment(Enrollment $enrollment, string $type, int $itemId): void
     {
-        $courseId = $this->resolveCourseId($enrollment);
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $quizPassingScoreMap = collect($snapshot['quiz_grade_items'] ?? [])
+            ->filter(fn ($item) => is_array($item) && isset($item['quiz_id']))
+            ->mapWithKeys(fn (array $item) => [
+                (int) $item['quiz_id'] => array_key_exists('passing_score', $item) && $item['passing_score'] !== null
+                    ? (int) $item['passing_score']
+                    : null,
+            ]);
 
-        // 1. Get all completed item IDs
         $completedLessonIds = LessonProgress::query()
             ->where('enrollment_id', $enrollment->id)
             ->whereNotNull('completed_at')
@@ -991,14 +855,15 @@ class EnrollmentService
             ->all();
 
         $passedQuizIds = QuizAttempt::query()
-            ->join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quiz_id')
             ->where('quiz_attempts.enrollment_id', $enrollment->id)
             ->where('quiz_attempts.status', 'graded')
-            ->where(function ($query) {
-                $query->whereNull('quizzes.passing_score')
-                      ->orWhereRaw('quiz_attempts.total_score >= quizzes.passing_score');
+            ->get(['quiz_id', 'total_score'])
+            ->filter(function (QuizAttempt $attempt) use ($quizPassingScoreMap): bool {
+                $passingScore = $quizPassingScoreMap->get((int) $attempt->quiz_id);
+
+                return $passingScore === null || (int) $attempt->total_score >= $passingScore;
             })
-            ->pluck('quiz_attempts.quiz_id')
+            ->pluck('quiz_id')
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
@@ -1013,10 +878,8 @@ class EnrollmentService
             ->values()
             ->all();
 
-        // 2. Get ordered learning contents
         $orderedItems = $this->getOrderedLearningContentsForEnrollment($enrollment);
 
-        // 3. Find the target item in the sequence
         $targetIndex = -1;
         foreach ($orderedItems as $index => $item) {
             if ($item['type'] === $type && $item['id'] === $itemId) {
@@ -1026,38 +889,813 @@ class EnrollmentService
         }
 
         if ($targetIndex === -1) {
-            // If the item is not part of the sequential curriculum (e.g. has no section),
-            // we treat it as unlocked by default to allow access/testing.
             return;
         }
 
         if ($targetIndex === 0) {
-            return; // First item is always unlocked
+            return;
         }
 
-        // 4. Check if all preceding items are completed
         $precedingItems = array_slice($orderedItems, 0, $targetIndex);
 
         foreach ($precedingItems as $item) {
             if ($item['type'] === 'lesson') {
-                if (!in_array($item['id'], $completedLessonIds, true)) {
+                if (! in_array($item['id'], $completedLessonIds, true)) {
                     throw ValidationException::withMessages([
                         'lesson_id' => ['Selesaikan lesson sebelumnya terlebih dahulu.'],
                     ]);
                 }
             } elseif ($item['type'] === 'quiz') {
-                if (!in_array($item['id'], $passedQuizIds, true)) {
+                if (! in_array($item['id'], $passedQuizIds, true)) {
                     throw ValidationException::withMessages([
                         'quiz_id' => ['Selesaikan kuis sebelumnya terlebih dahulu.'],
                     ]);
                 }
             } elseif ($item['type'] === 'assignment') {
-                if (!in_array($item['id'], $approvedAssignmentIds, true)) {
+                if (! in_array($item['id'], $approvedAssignmentIds, true)) {
                     throw ValidationException::withMessages([
                         'assignment_id' => ['Selesaikan tugas sebelumnya terlebih dahulu.'],
                     ]);
                 }
             }
         }
+    }
+
+    public function getSnapshotForEnrollment(Enrollment $enrollment): array
+    {
+        return $this->getCompletionSnapshot($enrollment);
+    }
+
+    public function getVisibleCurriculumCourseForEnrollment(Enrollment $enrollment): Course
+    {
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $course = $this->courseSnapshotService->loadCourseForCurriculum($this->resolveCourseId($enrollment));
+        $state = $this->buildLearningStateForEnrollment($enrollment, $snapshot);
+
+        return $this->courseSnapshotService->makeCourseModel(
+            $this->buildVisibleCurriculumSnapshot($course, $snapshot, $state)
+        );
+    }
+
+    public function findVisibleLessonForEnrollment(Enrollment $enrollment, int $lessonId): ?Lesson
+    {
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $state = $this->buildLearningStateForEnrollment($enrollment, $snapshot);
+        $lessonSnapshot = $this->findLessonSnapshotForEnrollment($enrollment, $lessonId);
+
+        if ($lessonSnapshot !== null) {
+            $liveLesson = $this->findLiveLessonForEnrollmentCourse($enrollment, $lessonId, true);
+            $sectionSnapshot = $this->findSectionSnapshotForItem($snapshot, 'lesson', $lessonId);
+            $resolvedLessonSnapshot = $liveLesson
+                ? $this->courseSnapshotService->makeLessonSnapshotFromModel($liveLesson)
+                : $lessonSnapshot;
+            $decoratedLesson = $this->makeLessonModelFromSnapshot(
+                $this->decorateLessonSnapshotForEnrollment(
+                    $resolvedLessonSnapshot,
+                    false,
+                    $liveLesson ? 'live' : 'snapshot_fallback',
+                    $state
+                )
+            );
+
+            if ($sectionSnapshot !== null) {
+                $decoratedLesson->setRelation(
+                    'section',
+                    $this->courseSnapshotService->makeSectionModel(
+                        $this->decorateCountedSectionSnapshot(
+                            $sectionSnapshot,
+                            $this->findLiveSectionSourceForSnapshot($enrollment, $sectionSnapshot)
+                        )
+                    )
+                );
+            }
+
+            return $decoratedLesson;
+        }
+
+        $liveLesson = $this->findLiveLessonForEnrollmentCourse($enrollment, $lessonId, true);
+        if (! $liveLesson) {
+            return null;
+        }
+
+        $lesson = $this->makeLessonModelFromSnapshot(
+            $this->decorateLessonSnapshotForEnrollment(
+                $this->courseSnapshotService->makeLessonSnapshotFromModel($liveLesson),
+                true,
+                'live',
+                $state
+            )
+        );
+
+        if ($liveLesson->relationLoaded('section') && $liveLesson->section) {
+            $lesson->setRelation(
+                'section',
+                $this->courseSnapshotService->makeSectionModel([
+                    'id' => (int) $liveLesson->section->id,
+                    'course_id' => (int) $liveLesson->section->course_id,
+                    'title' => $liveLesson->section->title,
+                    'sort_order' => $liveLesson->section->sort_order !== null ? (int) $liveLesson->section->sort_order : null,
+                    'lessons' => [],
+                    'quizzes' => [],
+                    'assignments' => [],
+                    'is_supplemental' => ! $this->sectionExistsInSnapshot($snapshot, (int) $liveLesson->section->id),
+                    'source' => 'live',
+                ])
+            );
+        }
+
+        return $lesson;
+    }
+
+    public function findVisibleQuizForEnrollment(
+        Enrollment $enrollment,
+        int $quizId,
+        bool $withQuestions = true,
+        bool $allowInactive = true
+    ): ?Quiz
+    {
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $state = $this->buildLearningStateForEnrollment($enrollment, $snapshot);
+        $quizSnapshot = $this->findQuizSnapshotForEnrollment($enrollment, $quizId);
+
+        if ($quizSnapshot !== null) {
+            $quiz = $this->makeQuizModelFromSnapshot(
+                $this->decorateQuizSnapshotForEnrollment($quizSnapshot, false, 'snapshot', $state),
+                $withQuestions
+            );
+
+            if (! $allowInactive && ! $quiz->is_active) {
+                throw ValidationException::withMessages([
+                    'quiz_id' => ['Quiz is not available for a new attempt.'],
+                ]);
+            }
+
+            return $quiz;
+        }
+
+        $liveQuiz = $this->findLiveQuizForEnrollmentCourse($enrollment, $quizId, $allowInactive, $withQuestions);
+        if (! $liveQuiz) {
+            return null;
+        }
+
+        return $this->makeQuizModelFromSnapshot(
+            $this->decorateQuizSnapshotForEnrollment(
+                $this->courseSnapshotService->makeQuizSnapshotFromModel($liveQuiz),
+                true,
+                'live',
+                $state
+            ),
+            $withQuestions
+        );
+    }
+
+    public function findVisibleAssignmentForEnrollment(Enrollment $enrollment, int $assignmentId): ?Assignment
+    {
+        $snapshot = $this->getCompletionSnapshot($enrollment);
+        $state = $this->buildLearningStateForEnrollment($enrollment, $snapshot);
+        $assignmentSnapshot = $this->findAssignmentSnapshotForEnrollment($enrollment, $assignmentId);
+
+        if ($assignmentSnapshot !== null) {
+            $sectionSnapshot = $this->findSectionSnapshotForItem($snapshot, 'assignment', $assignmentId);
+            $assignment = $this->makeAssignmentModelFromSnapshot(
+                $this->decorateAssignmentSnapshotForEnrollment($assignmentSnapshot, false, 'snapshot', $state)
+            );
+
+            if ($sectionSnapshot !== null) {
+                $assignment->setRelation(
+                    'section',
+                    $this->courseSnapshotService->makeSectionModel(
+                        $this->decorateCountedSectionSnapshot(
+                            $sectionSnapshot,
+                            $this->findLiveSectionSourceForSnapshot($enrollment, $sectionSnapshot)
+                        )
+                    )
+                );
+            }
+
+            return $assignment;
+        }
+
+        $liveAssignment = $this->findLiveAssignmentForEnrollmentCourse($enrollment, $assignmentId);
+        if (! $liveAssignment) {
+            return null;
+        }
+
+        $assignment = $this->makeAssignmentModelFromSnapshot(
+            $this->decorateAssignmentSnapshotForEnrollment(
+                $this->courseSnapshotService->makeAssignmentSnapshotFromModel($liveAssignment),
+                true,
+                'live',
+                $state
+            )
+        );
+
+        if ($liveAssignment->relationLoaded('section') && $liveAssignment->section) {
+            $assignment->setRelation(
+                'section',
+                $this->courseSnapshotService->makeSectionModel([
+                    'id' => (int) $liveAssignment->section->id,
+                    'course_id' => (int) $liveAssignment->section->course_id,
+                    'title' => $liveAssignment->section->title,
+                    'sort_order' => $liveAssignment->section->sort_order !== null ? (int) $liveAssignment->section->sort_order : null,
+                    'lessons' => [],
+                    'quizzes' => [],
+                    'assignments' => [],
+                    'is_supplemental' => ! $this->sectionExistsInSnapshot($snapshot, (int) $liveAssignment->section->id),
+                    'source' => 'live',
+                ])
+            );
+        }
+
+        return $assignment;
+    }
+
+    public function findLessonSnapshotForEnrollment(Enrollment $enrollment, int $lessonId): ?array
+    {
+        return $this->courseSnapshotService->findLessonSnapshot($this->getCompletionSnapshot($enrollment), $lessonId);
+    }
+
+    public function findQuizSnapshotForEnrollment(Enrollment $enrollment, int $quizId): ?array
+    {
+        return $this->courseSnapshotService->findQuizSnapshot($this->getCompletionSnapshot($enrollment), $quizId);
+    }
+
+    public function findAssignmentSnapshotForEnrollment(Enrollment $enrollment, int $assignmentId): ?array
+    {
+        return $this->courseSnapshotService->findAssignmentSnapshot($this->getCompletionSnapshot($enrollment), $assignmentId);
+    }
+
+    public function makeLessonModelFromSnapshot(array $lessonSnapshot): Lesson
+    {
+        return $this->courseSnapshotService->makeLessonModel($lessonSnapshot);
+    }
+
+    public function makeQuizModelFromSnapshot(array $quizSnapshot, bool $withQuestions = true): Quiz
+    {
+        return $this->courseSnapshotService->makeQuizModel($quizSnapshot, $withQuestions);
+    }
+
+    public function makeAssignmentModelFromSnapshot(array $assignmentSnapshot): Assignment
+    {
+        return $this->courseSnapshotService->makeAssignmentModel($assignmentSnapshot);
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function buildVisibleCurriculumSnapshot(Course $course, array $snapshot, array $state): array
+    {
+        $liveSections = $course->sections->keyBy(fn (Section $section) => (int) $section->id);
+        $snapshotLessonIds = collect($snapshot['lesson_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $snapshotQuizIds = collect($snapshot['quiz_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $snapshotAssignmentIds = collect($snapshot['assignment_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $snapshotSectionIds = [];
+        $sections = [];
+
+        foreach ($snapshot['sections'] ?? [] as $sectionSnapshot) {
+            if (! is_array($sectionSnapshot)) {
+                continue;
+            }
+
+            $sectionId = (int) ($sectionSnapshot['id'] ?? 0);
+            if ($sectionId <= 0) {
+                continue;
+            }
+
+            $snapshotSectionIds[] = $sectionId;
+            $liveSection = $liveSections->get($sectionId);
+
+            $sectionData = $this->decorateCountedSectionSnapshot(
+                $sectionSnapshot,
+                $liveSection ? 'live' : 'snapshot_fallback'
+            );
+            $sectionData['title'] = $liveSection?->title ?? ($sectionSnapshot['title'] ?? null);
+            $sectionData['sort_order'] = (int) ($sectionSnapshot['sort_order'] ?? 0);
+            $sectionData['lessons'] = collect($sectionSnapshot['lessons'] ?? [])
+                ->filter(fn ($lesson) => is_array($lesson))
+                ->map(function (array $lessonSnapshot) use ($course, $state): array {
+                    $lessonId = (int) ($lessonSnapshot['id'] ?? 0);
+                    $liveLesson = $course->sections
+                        ->flatMap(fn (Section $section) => $section->lessons)
+                        ->first(fn (Lesson $lesson) => (int) $lesson->id === $lessonId && (string) $lesson->status === 'published');
+
+                    $resolvedSnapshot = $liveLesson
+                        ? $this->courseSnapshotService->makeLessonSnapshotFromModel($liveLesson)
+                        : $lessonSnapshot;
+
+                    return $this->decorateLessonSnapshotForEnrollment(
+                        $resolvedSnapshot,
+                        false,
+                        $liveLesson ? 'live' : 'snapshot_fallback',
+                        $state
+                    );
+                })
+                ->values()
+                ->all();
+            $sectionData['quizzes'] = collect($sectionSnapshot['quizzes'] ?? [])
+                ->filter(fn ($quiz) => is_array($quiz))
+                ->map(fn (array $quizSnapshot) => $this->decorateQuizSnapshotForEnrollment($quizSnapshot, false, 'snapshot', $state))
+                ->values()
+                ->all();
+            $sectionData['assignments'] = collect($sectionSnapshot['assignments'] ?? [])
+                ->filter(fn ($assignment) => is_array($assignment))
+                ->map(fn (array $assignmentSnapshot) => $this->decorateAssignmentSnapshotForEnrollment($assignmentSnapshot, false, 'snapshot', $state))
+                ->values()
+                ->all();
+
+            if ($liveSection) {
+                foreach ($liveSection->lessons as $lesson) {
+                    if ((string) $lesson->status !== 'published' || in_array((int) $lesson->id, $snapshotLessonIds, true)) {
+                        continue;
+                    }
+
+                    $sectionData['lessons'][] = $this->decorateLessonSnapshotForEnrollment(
+                        $this->courseSnapshotService->makeLessonSnapshotFromModel($lesson),
+                        true,
+                        'live',
+                        $state
+                    );
+                }
+
+                foreach ($liveSection->quizzes as $quiz) {
+                    if (! $quiz->is_active || in_array((int) $quiz->id, $snapshotQuizIds, true)) {
+                        continue;
+                    }
+
+                    $sectionData['quizzes'][] = $this->decorateQuizSnapshotForEnrollment(
+                        $this->courseSnapshotService->makeQuizSnapshotFromModel($quiz),
+                        true,
+                        'live',
+                        $state
+                    );
+                }
+
+                foreach ($liveSection->assignments as $assignment) {
+                    if ((string) $assignment->status !== 'published' || in_array((int) $assignment->id, $snapshotAssignmentIds, true)) {
+                        continue;
+                    }
+
+                    $sectionData['assignments'][] = $this->decorateAssignmentSnapshotForEnrollment(
+                        $this->courseSnapshotService->makeAssignmentSnapshotFromModel($assignment),
+                        true,
+                        'live',
+                        $state
+                    );
+                }
+            }
+
+            $sections[] = $sectionData;
+        }
+
+        foreach ($course->sections as $section) {
+            if (in_array((int) $section->id, $snapshotSectionIds, true)) {
+                continue;
+            }
+
+            $lessonSnapshots = $section->lessons
+                ->filter(fn (Lesson $lesson) => (string) $lesson->status === 'published')
+                ->map(fn (Lesson $lesson) => $this->decorateLessonSnapshotForEnrollment(
+                    $this->courseSnapshotService->makeLessonSnapshotFromModel($lesson),
+                    true,
+                    'live',
+                    $state
+                ))
+                ->values()
+                ->all();
+
+            $quizSnapshots = $section->quizzes
+                ->filter(fn (Quiz $quiz) => (bool) $quiz->is_active)
+                ->map(fn (Quiz $quiz) => $this->decorateQuizSnapshotForEnrollment(
+                    $this->courseSnapshotService->makeQuizSnapshotFromModel($quiz),
+                    true,
+                    'live',
+                    $state
+                ))
+                ->values()
+                ->all();
+
+            $assignmentSnapshots = $section->assignments
+                ->filter(fn (Assignment $assignment) => (string) $assignment->status === 'published')
+                ->map(fn (Assignment $assignment) => $this->decorateAssignmentSnapshotForEnrollment(
+                    $this->courseSnapshotService->makeAssignmentSnapshotFromModel($assignment),
+                    true,
+                    'live',
+                    $state
+                ))
+                ->values()
+                ->all();
+
+            if ($lessonSnapshots === [] && $quizSnapshots === [] && $assignmentSnapshots === []) {
+                continue;
+            }
+
+            $sections[] = [
+                'id' => (int) $section->id,
+                'course_id' => (int) $section->course_id,
+                'title' => $section->title,
+                'sort_order' => $section->sort_order !== null ? (int) $section->sort_order : null,
+                'lessons' => $lessonSnapshots,
+                'quizzes' => $quizSnapshots,
+                'assignments' => $assignmentSnapshots,
+                'is_supplemental' => true,
+                'source' => 'live',
+            ];
+        }
+
+        return [
+            'course_id' => (int) $course->id,
+            'course_offering_id' => $snapshot['course_offering_id'] ?? null,
+            'course' => $this->buildCourseSnapshotPayload($course),
+            'sections' => $sections,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildCourseSnapshotPayload(Course $course): array
+    {
+        return [
+            'id' => (int) $course->id,
+            'title' => $course->title,
+            'slug' => $course->slug,
+            'description' => $course->description,
+            'category_id' => $course->category_id !== null ? (int) $course->category_id : null,
+            'category_name' => $course->relationLoaded('category') ? $course->category?->name : null,
+            'instructor_id' => $course->instructor_id !== null ? (int) $course->instructor_id : null,
+            'instructor_name' => $course->relationLoaded('instructor') ? $course->instructor?->fullname : null,
+            'thumbnail' => $course->thumbnail,
+            'requirements' => $course->requirements,
+            'outcomes' => $course->outcomes,
+            'status' => $course->getAttribute('status'),
+            'skills' => $course->relationLoaded('skills')
+                ? $course->skills->map(fn ($skill) => [
+                    'id' => (int) $skill->id,
+                    'name' => $skill->name,
+                    'slug' => $skill->slug,
+                ])->values()->all()
+                : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decorateCountedSectionSnapshot(array $sectionSnapshot, string $source): array
+    {
+        return array_merge($sectionSnapshot, [
+            'is_supplemental' => false,
+            'source' => $source,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function decorateLessonSnapshotForEnrollment(
+        array $lessonSnapshot,
+        bool $isSupplemental,
+        string $source,
+        array $state
+    ): array
+    {
+        return $this->attachLearningItemMeta('lesson', $lessonSnapshot, $isSupplemental, $source, $state);
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function decorateQuizSnapshotForEnrollment(
+        array $quizSnapshot,
+        bool $isSupplemental,
+        string $source,
+        array $state
+    ): array
+    {
+        return $this->attachLearningItemMeta('quiz', $quizSnapshot, $isSupplemental, $source, $state);
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function decorateAssignmentSnapshotForEnrollment(
+        array $assignmentSnapshot,
+        bool $isSupplemental,
+        string $source,
+        array $state
+    ): array
+    {
+        return $this->attachLearningItemMeta('assignment', $assignmentSnapshot, $isSupplemental, $source, $state);
+    }
+
+    /**
+     * @param  array<string, mixed>  $itemSnapshot
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private function attachLearningItemMeta(
+        string $type,
+        array $itemSnapshot,
+        bool $isSupplemental,
+        string $source,
+        array $state
+    ): array
+    {
+        $itemId = (int) ($itemSnapshot['id'] ?? 0);
+        $quizAttempts = $state['quiz_attempts_by_quiz_id']->get($itemId, collect());
+
+        $isCompleted = match ($type) {
+            'lesson' => in_array($itemId, $state['completed_lesson_ids'], true),
+            'quiz' => $this->hasPassedQuizAttempts($quizAttempts, $itemSnapshot['passing_score'] ?? null),
+            'assignment' => in_array($itemId, $state['approved_assignment_ids'], true),
+            default => false,
+        };
+
+        $hasUserActivity = match ($type) {
+            'lesson' => $state['lesson_progress_by_lesson_id']->has($itemId),
+            'quiz' => $state['quiz_attempts_by_quiz_id']->has($itemId),
+            'assignment' => $state['assignment_submissions_by_assignment_id']->has($itemId),
+            default => false,
+        };
+
+        $isNew = match ($type) {
+            'lesson', 'quiz', 'assignment' => $isSupplemental && ! $hasUserActivity,
+            default => false,
+        };
+
+        return array_merge($itemSnapshot, [
+            'is_supplemental' => $isSupplemental,
+            'counts_toward_progress' => ! $isSupplemental,
+            'counts_toward_certificate' => ! $isSupplemental,
+            'source' => $source,
+            'is_locked' => ! $isSupplemental && isset($state['locked_items'][$this->buildLearningItemKey($type, $itemId)]),
+            'is_new' => $isNew,
+            'is_completed' => $isCompleted,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $snapshot
+     * @return array<string, mixed>
+     */
+    private function buildLearningStateForEnrollment(Enrollment $enrollment, ?array $snapshot = null): array
+    {
+        $snapshot = $snapshot ?? $this->getCompletionSnapshot($enrollment);
+        $lessonProgressCollection = LessonProgress::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->get(['lesson_id', 'progress_seconds', 'last_accessed_at', 'completed_at']);
+        $completedLessonIds = $lessonProgressCollection
+            ->filter(fn (LessonProgress $progress) => $progress->completed_at !== null)
+            ->pluck('lesson_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $quizPassingScoreMap = collect($snapshot['quiz_grade_items'] ?? [])
+            ->filter(fn ($item) => is_array($item) && isset($item['quiz_id']))
+            ->mapWithKeys(fn (array $item) => [
+                (int) $item['quiz_id'] => array_key_exists('passing_score', $item) && $item['passing_score'] !== null
+                    ? (int) $item['passing_score']
+                    : null,
+            ]);
+        $quizAttemptsByQuizId = QuizAttempt::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->orderByDesc('submitted_at')
+            ->orderByDesc('id')
+            ->get(['id', 'quiz_id', 'status', 'total_score', 'started_at', 'submitted_at'])
+            ->groupBy(fn (QuizAttempt $attempt) => (int) $attempt->quiz_id);
+        $passedQuizIds = $quizPassingScoreMap->keys()
+            ->filter(fn ($quizId) => $this->hasPassedQuizAttempts(
+                $quizAttemptsByQuizId->get((int) $quizId, collect()),
+                $quizPassingScoreMap->get((int) $quizId)
+            ))
+            ->map(fn ($quizId) => (int) $quizId)
+            ->values()
+            ->all();
+        $assignmentSubmissionsByAssignmentId = AssignmentSubmission::query()
+            ->where('enrollment_id', $enrollment->id)
+            ->orderByDesc('attempt_no')
+            ->orderByDesc('id')
+            ->get(['id', 'assignment_id', 'status', 'attempt_no'])
+            ->groupBy(fn (AssignmentSubmission $submission) => (int) $submission->assignment_id);
+        $approvedAssignmentIds = $assignmentSubmissionsByAssignmentId->keys()
+            ->filter(function ($assignmentId) use ($assignmentSubmissionsByAssignmentId): bool {
+                return $assignmentSubmissionsByAssignmentId
+                    ->get((int) $assignmentId, collect())
+                    ->contains(fn (AssignmentSubmission $submission) => (string) $submission->status === 'approved');
+            })
+            ->map(fn ($assignmentId) => (int) $assignmentId)
+            ->values()
+            ->all();
+
+        return [
+            'lesson_progress_by_lesson_id' => $lessonProgressCollection->keyBy(fn (LessonProgress $progress) => (int) $progress->lesson_id),
+            'completed_lesson_ids' => $completedLessonIds,
+            'quiz_attempts_by_quiz_id' => $quizAttemptsByQuizId,
+            'approved_assignment_ids' => $approvedAssignmentIds,
+            'assignment_submissions_by_assignment_id' => $assignmentSubmissionsByAssignmentId,
+            'locked_items' => $this->buildLockedItemMap($snapshot, $completedLessonIds, $passedQuizIds, $approvedAssignmentIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @param  array<int>  $completedLessonIds
+     * @param  array<int>  $passedQuizIds
+     * @param  array<int>  $approvedAssignmentIds
+     * @return array<string, bool>
+     */
+    private function buildLockedItemMap(
+        array $snapshot,
+        array $completedLessonIds,
+        array $passedQuizIds,
+        array $approvedAssignmentIds
+    ): array
+    {
+        $lockedItems = [];
+        $previousItemCompleted = true;
+
+        foreach ($this->getOrderedItemsFromSnapshot($snapshot) as $item) {
+            if (! $previousItemCompleted) {
+                $lockedItems[$this->buildLearningItemKey($item['type'], $item['id'])] = true;
+            }
+
+            $previousItemCompleted = match ($item['type']) {
+                'lesson' => in_array($item['id'], $completedLessonIds, true),
+                'quiz' => in_array($item['id'], $passedQuizIds, true),
+                'assignment' => in_array($item['id'], $approvedAssignmentIds, true),
+                default => true,
+            };
+        }
+
+        return $lockedItems;
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return array<int, array{type:string,id:int,section_id:int|null}>
+     */
+    private function getOrderedItemsFromSnapshot(array $snapshot): array
+    {
+        return collect($snapshot['ordered_items'] ?? [])
+            ->filter(fn ($item) => is_array($item) && isset($item['type'], $item['id']))
+            ->map(fn (array $item) => [
+                'type' => (string) $item['type'],
+                'id' => (int) $item['id'],
+                'section_id' => isset($item['section_id']) ? (int) $item['section_id'] : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function buildLearningItemKey(string $type, int $itemId): string
+    {
+        return sprintf('%s:%d', $type, $itemId);
+    }
+
+    private function hasPassedQuizAttempts(Collection $attempts, mixed $passingScore): bool
+    {
+        $gradedAttempts = $attempts->filter(fn (QuizAttempt $attempt) => (string) $attempt->status === 'graded');
+
+        if ($gradedAttempts->isEmpty()) {
+            return false;
+        }
+
+        if ($passingScore === null) {
+            return true;
+        }
+
+        return $gradedAttempts->contains(fn (QuizAttempt $attempt) => (int) $attempt->total_score >= (int) $passingScore);
+    }
+
+    private function findLiveLessonForEnrollmentCourse(
+        Enrollment $enrollment,
+        int $lessonId,
+        bool $publishedOnly = true
+    ): ?Lesson
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+        $query = Lesson::withTrashed()
+            ->with(['section' => fn ($builder) => $builder->withTrashed()])
+            ->where('id', $lessonId)
+            ->whereHas('section', function ($builder) use ($courseId) {
+                $builder->withTrashed()->where('course_id', $courseId);
+            });
+
+        if ($publishedOnly) {
+            $query->whereNull('deleted_at')->where('status', 'published');
+        }
+
+        return $query->first();
+    }
+
+    private function findLiveQuizForEnrollmentCourse(
+        Enrollment $enrollment,
+        int $quizId,
+        bool $allowInactive = true,
+        bool $withQuestions = true
+    ): ?Quiz
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+        $query = Quiz::withTrashed()
+            ->with([
+                'section' => fn ($builder) => $builder->withTrashed(),
+                'questions' => function ($builder) use ($withQuestions) {
+                    if (! $withQuestions) {
+                        return;
+                    }
+
+                    $builder->withTrashed()->orderBy('sort_order')->orderBy('id');
+                },
+                'questions.options' => fn ($builder) => $builder->withTrashed()->orderBy('id'),
+            ])
+            ->where('id', $quizId)
+            ->where('course_id', $courseId);
+
+        if (! $allowInactive) {
+            $query->whereNull('deleted_at')->where('is_active', true);
+        }
+
+        return $query->first();
+    }
+
+    private function findLiveAssignmentForEnrollmentCourse(Enrollment $enrollment, int $assignmentId): ?Assignment
+    {
+        $courseId = $this->resolveCourseId($enrollment);
+
+        return Assignment::withTrashed()
+            ->with(['section' => fn ($builder) => $builder->withTrashed()])
+            ->where('id', $assignmentId)
+            ->where('course_id', $courseId)
+            ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     */
+    private function sectionExistsInSnapshot(array $snapshot, int $sectionId): bool
+    {
+        foreach ($snapshot['sections'] ?? [] as $section) {
+            if ((int) ($section['id'] ?? 0) === $sectionId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $sectionSnapshot
+     */
+    private function findLiveSectionSourceForSnapshot(Enrollment $enrollment, array $sectionSnapshot): string
+    {
+        $sectionId = (int) ($sectionSnapshot['id'] ?? 0);
+        if ($sectionId <= 0) {
+            return 'snapshot_fallback';
+        }
+
+        $courseId = $this->resolveCourseId($enrollment);
+
+        return Section::withTrashed()
+            ->where('id', $sectionId)
+            ->where('course_id', $courseId)
+            ->exists()
+                ? 'live'
+                : 'snapshot_fallback';
+    }
+
+    private function findSectionSnapshotForItem(array $snapshot, string $type, int $itemId): ?array
+    {
+        $collectionKey = match ($type) {
+            'lesson' => 'lessons',
+            'quiz' => 'quizzes',
+            'assignment' => 'assignments',
+            default => null,
+        };
+
+        if ($collectionKey === null) {
+            return null;
+        }
+
+        foreach ($snapshot['sections'] ?? [] as $section) {
+            foreach ($section[$collectionKey] ?? [] as $item) {
+                if ((int) ($item['id'] ?? 0) === $itemId) {
+                    return $section;
+                }
+            }
+        }
+
+        return null;
     }
 }

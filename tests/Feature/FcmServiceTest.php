@@ -60,7 +60,7 @@ class FcmServiceTest extends TestCase
                 && data_get($request->data(), 'message.notification.title') === 'Pembayaran berhasil'
                 && data_get($request->data(), 'message.webpush.headers.Urgency') === 'high'
                 && data_get($request->data(), 'message.webpush.notification.title') === 'Pembayaran berhasil'
-                && data_get($request->data(), 'message.webpush.notification.badge') === '/globe.svg'
+                && data_get($request->data(), 'message.webpush.notification.badge') === 'https://skripsi.test/app-icon-maskable-192.png'
                 && data_get($request->data(), 'message.webpush.fcm_options.link') === 'https://skripsi.test/student/orders/44'
                 && data_get($request->data(), 'message.data.order_id') === '44';
         });

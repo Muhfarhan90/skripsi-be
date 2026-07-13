@@ -195,6 +195,9 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'activity-log-causer', 'admi
     Route::post('/courses/{courseId}/sections/{sectionId}/quizzes', [QuizController::class, 'storeForSection']);
     Route::put('/courses/{courseId}/sections/{sectionId}/quizzes/{quizId}', [QuizController::class, 'updateForSection']);
 
+    Route::get('/quizzes/question-bank/template', [QuestionController::class, 'exportTemplate']);
+    Route::get('/quizzes/{quizId}/question-bank/export', [QuestionController::class, 'exportForQuiz']);
+    Route::post('/quizzes/{quizId}/question-bank/import', [QuestionController::class, 'importForQuiz']);
     Route::post('/quizzes/{quizId}/questions', [QuestionController::class, 'storeForQuiz']);
     Route::put('/quizzes/{quizId}/questions/reorder', [QuestionController::class, 'reorderForQuiz']);
     Route::put('/quizzes/{quizId}/questions/{questionId}', [QuestionController::class, 'updateForQuiz']);

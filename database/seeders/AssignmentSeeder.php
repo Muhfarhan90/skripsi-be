@@ -20,15 +20,12 @@ class AssignmentSeeder extends Seeder
             ->keyBy('slug');
         $fallbackCreatorId = User::where('email', 'instructor@example.com')->value('id')
             ?? User::where('email', 'admin@example.com')->value('id');
-        $now = now();
-
         $rows = [
             [
                 'course_slug' => 'pemrograman-web',
                 'title' => 'Tugas Project Pemrograman Web',
                 'description' => 'Project sederhana untuk menguji pemahaman dasar pembuatan halaman web.',
                 'instructions' => 'Buat satu halaman web responsif berisi profil produk atau layanan. Sertakan HTML, CSS, dan JavaScript sederhana jika diperlukan.',
-                'due_at' => $now->copy()->addDays(30),
                 'is_required_for_certificate' => true,
                 'allow_resubmission' => true,
                 'max_attempts' => 3,
@@ -39,7 +36,6 @@ class AssignmentSeeder extends Seeder
                 'title' => 'Tugas Studi Kasus Anamnesis',
                 'description' => 'Latihan memahami alur anamnesis awal melalui studi kasus sederhana.',
                 'instructions' => 'Baca skenario pasien, lalu tuliskan pertanyaan anamnesis utama, dugaan awal, dan edukasi keselamatan pasien secara ringkas.',
-                'due_at' => $now->copy()->addDays(21),
                 'is_required_for_certificate' => true,
                 'allow_resubmission' => true,
                 'max_attempts' => 3,
@@ -50,7 +46,6 @@ class AssignmentSeeder extends Seeder
                 'title' => 'Tugas Rencana Budidaya Modern',
                 'description' => 'Latihan menyusun rencana budidaya sederhana dengan pendekatan teknologi dan pemantauan data.',
                 'instructions' => 'Pilih satu komoditas, lalu susun rencana budidaya, kebutuhan monitoring, dan indikator keberhasilan panen.',
-                'due_at' => $now->copy()->addDays(25),
                 'is_required_for_certificate' => true,
                 'allow_resubmission' => true,
                 'max_attempts' => 3,
@@ -82,7 +77,6 @@ class AssignmentSeeder extends Seeder
                     'title' => $row['title'],
                     'description' => $row['description'],
                     'instructions' => $row['instructions'],
-                    'due_at' => $row['due_at'],
                     'is_required_for_certificate' => $row['is_required_for_certificate'],
                     'allow_resubmission' => $row['allow_resubmission'],
                     'max_attempts' => $row['max_attempts'],

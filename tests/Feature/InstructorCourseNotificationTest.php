@@ -9,6 +9,7 @@ use App\Models\CourseOffering;
 use App\Models\Enrollment;
 use App\Models\Notification;
 use App\Models\Role;
+use App\Models\Section;
 use App\Models\User;
 use App\Services\AssignmentService;
 use App\Services\ForumService;
@@ -107,9 +108,15 @@ function enrollNotificationUser(User $user, CourseOffering $offering): Enrollmen
 it('notifies course instructor and admins when a student submits an assignment', function () {
     Queue::fake();
     $fixture = createInstructorNotificationFixture();
+    $section = Section::query()->create([
+        'course_id' => $fixture['course']->id,
+        'title' => 'Notification Section',
+        'sort_order' => 1,
+    ]);
 
     $assignment = Assignment::query()->create([
         'course_id' => $fixture['course']->id,
+        'section_id' => $section->id,
         'created_by' => $fixture['instructor']->id,
         'title' => 'Notification Assignment',
         'status' => 'published',

@@ -21,12 +21,14 @@ class AssignmentSubmission extends Model
         'reviewed_by',
         'submitted_at',
         'reviewed_at',
+        'assignment_snapshot',
     ];
 
     protected $casts = [
         'attempt_no' => 'integer',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'assignment_snapshot' => 'array',
     ];
 
     public function assignment()

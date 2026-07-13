@@ -22,4 +22,5 @@ docs {
   URI: api/enrollments/{id}/quizzes/{quizId}
   Action: App\Http\Controllers\Api\EnrollmentController@quizDetail
   Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum
+  Response Notes: Quiz detail dapat berasal dari snapshot counted atau live supplemental, dan menyertakan flag is_supplemental, counts_toward_progress, counts_toward_certificate, source, is_locked, is_new, dan is_completed.
 }

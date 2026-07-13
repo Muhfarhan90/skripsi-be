@@ -254,7 +254,7 @@ it('handles scoped option CRUD under question route', function () {
         ->assertOk()
         ->assertJsonPath('success', true);
 
-    $this->assertDatabaseMissing('options', [
+    $this->assertSoftDeleted('options', [
         'id' => $optionId,
     ]);
 });
@@ -316,5 +316,208 @@ it('returns nested quiz detail and deletes related question/options on quiz dele
 
     $this->assertSoftDeleted('quizzes', ['id' => $quizId]);
     $this->assertSoftDeleted('questions', ['id' => $questionId]);
-    $this->assertDatabaseMissing('options', ['id' => $optionId]);
+    $this->assertSoftDeleted('options', ['id' => $optionId]);
+});
+
+it('updates question limit through flat admin quiz update route', function () {
+    $admin = createAdminUser();
+    Sanctum::actingAs($admin);
+
+    [$course, $section] = createCourseWithSection('EtaFlat', $admin);
+
+    $quizId = $this->postJson("/api/admin/courses/{$course->id}/sections/{$section->id}/quizzes", [
+        'title' => 'Quiz Eta Flat',
+        'duration' => 25,
+        'passing_score' => 70,
+        'weight' => 10,
+        'is_active' => true,
+        'is_random' => true,
+        'question_limit' => 2,
+        'max_attempts' => 3,
+    ])->json('data.id');
+
+    $this->putJson("/api/admin/quizzes/{$quizId}", [
+        'course_id' => $course->id,
+        'section_id' => $section->id,
+        'title' => 'Quiz Eta Flat',
+        'description' => null,
+        'duration' => 25,
+        'passing_score' => 70,
+        'weight' => 10,
+        'is_active' => true,
+        'is_random' => true,
+        'question_limit' => 4,
+        'max_attempts' => 3,
+    ])->assertOk()
+      ->assertJsonPath('data.question_limit', 4)
+      ->assertJsonPath('data.is_random', true);
+
+    $this->assertDatabaseHas('quizzes', [
+        'id' => $quizId,
+        'question_limit' => 4,
+    ]);
+
+    $this->getJson("/api/admin/quizzes/{$quizId}")
+        ->assertOk()
+        ->assertJsonPath('data.question_limit', 4);
+});
+
+it('imports question bank payload into a quiz bank and rebalances scores', function () {
+    $admin = createAdminUser();
+    Sanctum::actingAs($admin);
+
+    [$course, $section] = createCourseWithSection('Theta', $admin);
+    $quizId = $this->postJson("/api/admin/courses/{$course->id}/sections/{$section->id}/quizzes", [
+        'title' => 'Quiz Theta',
+        'duration' => 20,
+        'passing_score' => 70,
+        'weight' => 10,
+        'is_active' => true,
+        'is_random' => true,
+        'question_limit' => 1,
+    ])->json('data.id');
+
+    $response = $this->postJson("/api/admin/quizzes/{$quizId}/question-bank/import", [
+        'mode' => 'append',
+        'questions' => [
+            [
+                'question_text' => '2 + 2 = ?',
+                'type' => 'multiple_choice',
+                'is_active' => true,
+                'options' => [
+                    ['option_text' => '4', 'is_correct' => true],
+                    ['option_text' => '5', 'is_correct' => false],
+                ],
+            ],
+            [
+                'question_text' => 'Langit berwarna biru',
+                'type' => 'true_false',
+                'is_active' => true,
+                'options' => [
+                    ['option_text' => 'True', 'is_correct' => true],
+                    ['option_text' => 'False', 'is_correct' => false],
+                ],
+            ],
+        ],
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.imported_questions', 2)
+        ->assertJsonPath('data.imported_options', 4)
+        ->assertJsonPath('data.mode', 'append');
+
+    $this->getJson("/api/admin/quizzes/{$quizId}")
+        ->assertOk()
+        ->assertJsonCount(2, 'data.questions')
+        ->assertJsonPath('data.questions.0.question_text', '2 + 2 = ?')
+        ->assertJsonPath('data.questions.0.score', 50)
+        ->assertJsonPath('data.questions.0.options.0.option_text', '4')
+        ->assertJsonPath('data.questions.1.question_text', 'Langit berwarna biru')
+        ->assertJsonPath('data.questions.1.score', 50)
+        ->assertJsonPath('data.questions.1.options.1.option_text', 'False');
+});
+
+it('replaces existing question bank when importing question bank payload in replace mode', function () {
+    $admin = createAdminUser();
+    Sanctum::actingAs($admin);
+
+    [$course, $section] = createCourseWithSection('Iota', $admin);
+    $quizId = $this->postJson("/api/admin/courses/{$course->id}/sections/{$section->id}/quizzes", [
+        'title' => 'Quiz Iota',
+        'duration' => 20,
+        'passing_score' => 70,
+        'weight' => 10,
+        'is_active' => true,
+        'is_random' => false,
+    ])->json('data.id');
+
+    $oldQuestionId = $this->postJson("/api/admin/quizzes/{$quizId}/questions", [
+        'question_text' => 'Old Question',
+        'type' => 'multiple_choice',
+        'is_active' => true,
+    ])->json('data.id');
+
+    $oldOptionId = $this->postJson("/api/admin/questions/{$oldQuestionId}/options", [
+        'option_text' => 'Old Option',
+        'is_correct' => true,
+    ])->json('data.id');
+
+    $this->postJson("/api/admin/quizzes/{$quizId}/question-bank/import", [
+        'questions' => [
+            [
+                'question_text' => 'Pertanyaan Baru',
+                'type' => 'multiple_choice',
+                'is_active' => true,
+                'options' => [
+                    ['option_text' => 'Opsi Benar', 'is_correct' => true],
+                    ['option_text' => 'Opsi Salah', 'is_correct' => false],
+                ],
+            ],
+        ],
+        'mode' => 'replace',
+    ])->assertOk()
+      ->assertJsonPath('data.imported_questions', 1)
+      ->assertJsonPath('data.mode', 'replace');
+
+    $this->assertSoftDeleted('questions', ['id' => $oldQuestionId]);
+    $this->assertSoftDeleted('options', ['id' => $oldOptionId]);
+
+    $this->getJson("/api/admin/quizzes/{$quizId}")
+        ->assertOk()
+        ->assertJsonCount(1, 'data.questions')
+        ->assertJsonPath('data.questions.0.question_text', 'Pertanyaan Baru')
+        ->assertJsonPath('data.questions.0.score', 100)
+        ->assertJsonPath('data.questions.0.options.0.option_text', 'Opsi Benar');
+});
+
+it('exports quiz question bank aiken and template aiken', function () {
+    $admin = createAdminUser();
+    Sanctum::actingAs($admin);
+
+    [$course, $section] = createCourseWithSection('Kappa', $admin);
+    $quizId = $this->postJson("/api/admin/courses/{$course->id}/sections/{$section->id}/quizzes", [
+        'title' => 'Quiz Kappa Export',
+        'duration' => 20,
+        'passing_score' => 70,
+        'weight' => 10,
+        'is_active' => true,
+        'is_random' => false,
+    ])->json('data.id');
+
+    $questionId = $this->postJson("/api/admin/quizzes/{$quizId}/questions", [
+        'question_text' => 'Question Export',
+        'type' => 'multiple_choice',
+        'is_active' => true,
+    ])->json('data.id');
+
+    $this->postJson("/api/admin/questions/{$questionId}/options", [
+        'option_text' => 'Correct Export',
+        'is_correct' => true,
+    ])->assertOk();
+
+    $this->postJson("/api/admin/questions/{$questionId}/options", [
+        'option_text' => 'Wrong Export',
+        'is_correct' => false,
+    ])->assertOk();
+
+    $templateResponse = $this->get("/api/admin/quizzes/question-bank/template");
+    $templateResponse->assertOk()
+        ->assertHeader('content-type', 'text/plain; charset=UTF-8');
+
+    expect($templateResponse->getContent())
+        ->toContain('What is the correct answer to this question?')
+        ->toContain('ANSWER: D');
+
+    $exportResponse = $this->get("/api/admin/quizzes/{$quizId}/question-bank/export");
+    $exportResponse->assertOk()
+        ->assertHeader('content-type', 'text/plain; charset=UTF-8');
+
+    expect($exportResponse->getContent())
+        ->toContain('Question Export')
+        ->toContain('A. Correct Export')
+        ->toContain('B. Wrong Export')
+        ->toContain('ANSWER: A')
+        ->toContain('Correct Export')
+        ->toContain('Wrong Export');
 });

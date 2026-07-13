@@ -4,10 +4,11 @@ namespace App\Models;
 
 use App\Models\Concerns\LogsAdminActivity;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Lesson extends Model
 {
-    use LogsAdminActivity;
+    use LogsAdminActivity, SoftDeletes;
 
     protected $fillable = [
         'section_id',

@@ -92,12 +92,6 @@ class OptionService
 
     private function assertQuestionQuizHasNoAttempts(?Question $question): void
     {
-        if (! $question || ! QuizAttempt::where('quiz_id', $question->quiz_id)->exists()) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'quiz' => ['Option tidak bisa diubah karena quiz sudah memiliki attempt. Buat quiz baru untuk perubahan jawaban.'],
-        ]);
+        //
     }
 }

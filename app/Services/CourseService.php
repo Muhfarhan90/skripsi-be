@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Assignment;
 use App\Models\Course;
 use App\Models\Lesson;
+use App\Models\Quiz;
 use App\Models\Section;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -109,7 +111,7 @@ class CourseService
                     $query->orderByDesc('id');
                 },
                 'sections.assignments' => function ($query) {
-                    $query->orderBy('due_at')->orderBy('id');
+                    $query->orderBy('id');
                 },
             ])
             ->withCount('reviews')
@@ -137,7 +139,7 @@ class CourseService
                 $query->orderByDesc('id');
             },
             'sections.assignments' => function ($query) {
-                $query->orderBy('due_at')->orderBy('id');
+                $query->orderBy('id');
             },
         ]);
 
@@ -242,7 +244,6 @@ class CourseService
             $incomingSections = collect($data['sections'] ?? []);
             $existingSections = $course->sections->keyBy('id');
             $keptSectionIds = [];
-            $hasEnrollments = $this->courseHasEnrollments($courseId);
 
             foreach ($incomingSections as $sectionIndex => $sectionData) {
                 $sectionId = isset($sectionData['id']) ? (int) $sectionData['id'] : null;
@@ -301,31 +302,19 @@ class CourseService
                     $keptLessonIds[] = $lesson->id;
                 }
 
-                if ($hasEnrollments) {
-                    $section->lessons()
-                        ->whereNotIn('id', $keptLessonIds)
-                        ->update(['status' => 'archived']);
-                } elseif (count($keptLessonIds) > 0) {
+                if (count($keptLessonIds) > 0) {
                     $section->lessons()->whereNotIn('id', $keptLessonIds)->delete();
                 } else {
                     $section->lessons()->delete();
                 }
             }
 
-            if ($hasEnrollments) {
-                $removedSectionExists = Section::where('course_id', $courseId)
-                    ->whereNotIn('id', $keptSectionIds)
-                    ->exists();
+            $removedSections = count($keptSectionIds) > 0
+                ? Section::where('course_id', $courseId)->whereNotIn('id', $keptSectionIds)->get()
+                : Section::where('course_id', $courseId)->get();
 
-                if ($removedSectionExists) {
-                    throw ValidationException::withMessages([
-                        'sections' => ['Section tidak bisa dihapus karena course sudah memiliki enrollment. Archive lesson atau ubah konten tanpa menghapus section.'],
-                    ]);
-                }
-            } elseif (count($keptSectionIds) > 0) {
-                Section::where('course_id', $courseId)->whereNotIn('id', $keptSectionIds)->delete();
-            } else {
-                Section::where('course_id', $courseId)->delete();
+            foreach ($removedSections as $removedSection) {
+                $this->softDeleteSectionContents($removedSection);
             }
 
             return $this->findByIdWithCurriculum($courseId);
@@ -353,6 +342,28 @@ class CourseService
             ->where('id', $courseId)
             ->whereHas('courseOfferings.enrollments')
             ->exists();
+    }
+
+    private function softDeleteSectionContents(Section $section): void
+    {
+        $section->lessons()->delete();
+        $section->assignments()->delete();
+
+        foreach ($section->quizzes()->get() as $quiz) {
+            $this->softDeleteQuizTree($quiz);
+        }
+
+        $section->delete();
+    }
+
+    private function softDeleteQuizTree(Quiz $quiz): void
+    {
+        foreach ($quiz->questions()->get() as $question) {
+            $question->options()->delete();
+            $question->delete();
+        }
+
+        $quiz->delete();
     }
 
     private function applyPublishedOfferingScope($query): void

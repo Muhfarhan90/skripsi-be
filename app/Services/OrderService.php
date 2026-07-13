@@ -23,15 +23,18 @@ class OrderService
     protected TransactionService $transactionService;
     protected NotificationService $notificationService;
     protected MidtransPaymentService $midtransPaymentService;
+    protected CourseSnapshotService $courseSnapshotService;
 
     public function __construct(
         TransactionService $transactionService,
         NotificationService $notificationService,
-        MidtransPaymentService $midtransPaymentService
+        MidtransPaymentService $midtransPaymentService,
+        CourseSnapshotService $courseSnapshotService
     ) {
         $this->transactionService = $transactionService;
         $this->notificationService = $notificationService;
         $this->midtransPaymentService = $midtransPaymentService;
+        $this->courseSnapshotService = $courseSnapshotService;
     }
 
     /*
@@ -632,67 +635,7 @@ class OrderService
 
     private function buildCompletionSnapshot(CourseOffering $offering): array
     {
-        $offering->loadMissing('course');
-        $courseId = (int) $offering->course_id;
-        $course = $offering->course;
-
-        $lessonIds = Lesson::query()
-            ->select('lessons.id')
-            ->join('sections', 'sections.id', '=', 'lessons.section_id')
-            ->where('sections.course_id', $courseId)
-            ->where('lessons.status', 'published')
-            ->orderBy('sections.sort_order')
-            ->orderBy('sections.id')
-            ->orderBy('lessons.sort_order')
-            ->orderBy('lessons.id')
-            ->pluck('lessons.id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        $quizzes = Quiz::query()
-            ->where('course_id', $courseId)
-            ->where('is_active', true)
-            ->orderBy('id')
-            ->get(['id', 'passing_score', 'weight']);
-
-        $assignments = Assignment::query()
-            ->where('course_id', $courseId)
-            ->where('status', 'published')
-            ->orderBy('due_at')
-            ->orderBy('id')
-            ->get([
-                'id',
-                'is_required_for_certificate',
-            ]);
-
-        return [
-            'course_id' => $courseId,
-            'course_offering_id' => (int) $offering->id,
-            'lesson_ids' => $lessonIds,
-            'quiz_ids' => $quizzes->pluck('id')->map(fn ($id) => (int) $id)->all(),
-            'assignment_ids' => $assignments->pluck('id')->map(fn ($id) => (int) $id)->all(),
-            'required_assignment_ids' => $assignments
-                ->filter(fn (Assignment $assignment) => (bool) $assignment->is_required_for_certificate)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all(),
-            'quiz_grade_items' => $quizzes
-                ->map(fn (Quiz $quiz) => [
-                    'quiz_id' => (int) $quiz->id,
-                    'weight' => (int) ($quiz->weight ?? 0),
-                    'passing_score' => $quiz->passing_score !== null ? (int) $quiz->passing_score : null,
-                ])
-                ->values()
-                ->all(),
-            'assignment_grade_items' => $assignments
-                ->map(fn (Assignment $assignment) => [
-                    'assignment_id' => (int) $assignment->id,
-                    'is_required_for_certificate' => (bool) $assignment->is_required_for_certificate,
-                ])
-                ->values()
-                ->all(),
-            'snapshot_at' => now()->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
-        ];
+        return $this->courseSnapshotService->buildForCourseId((int) $offering->course_id, (int) $offering->id);
     }
 
     private function buildAdminListQuery(string $search = ''): Builder

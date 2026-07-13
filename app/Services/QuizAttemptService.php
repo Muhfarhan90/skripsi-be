@@ -16,10 +16,12 @@ class QuizAttemptService
     private const RETAKE_COOLDOWN_MINUTES = 5;
 
     protected EnrollmentService $enrollmentService;
+    protected CourseSnapshotService $courseSnapshotService;
 
-    public function __construct(EnrollmentService $enrollmentService)
+    public function __construct(EnrollmentService $enrollmentService, CourseSnapshotService $courseSnapshotService)
     {
         $this->enrollmentService = $enrollmentService;
+        $this->courseSnapshotService = $courseSnapshotService;
     }
 
     public function getAttemptsByQuizForUser(int $userId, int $enrollmentId, int $quizId)
@@ -41,7 +43,6 @@ class QuizAttemptService
         $this->enrollmentService->assertCanWriteLearning($enrollment);
         $this->enrollmentService->assertQuizUnlockedForEnrollment($enrollment, $quizId);
         $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, false);
-        $this->assertQuizIsOpenForAttempt($quiz);
         $this->assertQuizIsNotPassed($enrollment, $quiz);
 
         $inProgress = QuizAttempt::where('enrollment_id', $enrollmentId)
@@ -82,9 +83,19 @@ class QuizAttemptService
             'started_at' => now(),
         ]);
 
-        $questions = Question::where('quiz_id', $quiz->id)
-            ->where('is_active', true)
-            ->get();
+        $quizSnapshot = $this->requireQuizSnapshotForEnrollment($enrollment, $quizId);
+        $questions = collect($quizSnapshot['questions'] ?? [])
+            ->filter(fn ($question) => is_array($question) && (bool) ($question['is_active'] ?? false))
+            ->sort(function (array $left, array $right): int {
+                $sortOrderComparison = ((int) ($left['sort_order'] ?? 0)) <=> ((int) ($right['sort_order'] ?? 0));
+
+                if ($sortOrderComparison !== 0) {
+                    return $sortOrderComparison;
+                }
+
+                return ((int) ($left['id'] ?? 0)) <=> ((int) ($right['id'] ?? 0));
+            })
+            ->values();
 
         if ($quiz->is_random) {
             $questions = $questions->shuffle();
@@ -94,14 +105,17 @@ class QuizAttemptService
             $questions = $questions->take($quiz->question_limit);
         }
 
+        $questions = $this->normalizeQuestionScoresForAttempt($questions);
+
         foreach ($questions as $question) {
             QuizAnswer::create([
                 'attempt_id' => $attempt->id,
-                'question_id' => $question->id,
+                'question_id' => (int) $question['id'],
                 'selected_option_id' => null,
                 'answer_text' => null,
                 'is_correct' => null,
                 'score' => 0,
+                'question_snapshot' => $question,
             ]);
         }
 
@@ -133,7 +147,6 @@ class QuizAttemptService
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
         $this->enrollmentService->assertCanWriteLearning($enrollment);
         $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, true);
-        $this->assertQuizIsOpenForAttempt($quiz);
         $attempt = $this->findAttemptForUser($userId, $enrollmentId, $quizId, $attemptId);
 
         if ($attempt->status !== 'in_progress') {
@@ -152,7 +165,6 @@ class QuizAttemptService
         $enrollment = $this->findEnrollmentForUser($userId, $enrollmentId);
         $this->enrollmentService->assertCanWriteLearning($enrollment);
         $quiz = $this->findQuizForEnrollment($enrollmentId, $quizId, true);
-        $this->assertQuizIsOpenForAttempt($quiz);
         $attempt = $this->findAttemptForUser($userId, $enrollmentId, $quizId, $attemptId);
 
         if ($attempt->status !== 'in_progress') {
@@ -169,12 +181,14 @@ class QuizAttemptService
         }
 
         $submittedAttempt = DB::transaction(function () use ($attempt) {
-            $totalScore = (int) QuizAnswer::where('attempt_id', $attempt->id)->sum('score');
-            $hasManualReview = QuizAnswer::query()
-                ->join('questions', 'questions.id', '=', 'quiz_answers.question_id')
-                ->where('quiz_answers.attempt_id', $attempt->id)
-                ->whereIn('questions.type', ['short_answer', 'essay'])
-                ->exists();
+            $answers = QuizAnswer::where('attempt_id', $attempt->id)->get();
+            $totalScore = (int) $answers->sum('score');
+            $hasManualReview = $answers->contains(function (QuizAnswer $answer): bool {
+                $questionSnapshot = $this->resolveQuestionSnapshotForAnswer($answer, null);
+                $questionType = (string) ($questionSnapshot['type'] ?? '');
+
+                return in_array($questionType, ['short_answer', 'essay'], true);
+            });
 
             $attempt->update([
                 'total_score' => $totalScore,
@@ -192,7 +206,7 @@ class QuizAttemptService
 
     public function getAttemptsByQuizForAdmin(int $quizId)
     {
-        Quiz::findOrFail($quizId);
+        Quiz::withTrashed()->findOrFail($quizId);
 
         return QuizAttempt::where('quiz_id', $quizId)
             ->latest()
@@ -201,7 +215,7 @@ class QuizAttemptService
 
     public function findAttemptForAdmin(int $quizId, int $attemptId): QuizAttempt
     {
-        Quiz::findOrFail($quizId);
+        Quiz::withTrashed()->findOrFail($quizId);
 
         return QuizAttempt::with('answers')
             ->where('id', $attemptId)
@@ -219,22 +233,20 @@ class QuizAttemptService
             ]);
         }
 
-        $question = Question::where('id', $questionId)
-            ->where('quiz_id', $quizId)
+        $answer = QuizAnswer::where('attempt_id', $attempt->id)
+            ->where('question_id', $questionId)
             ->firstOrFail();
+        $questionSnapshot = $this->resolveQuestionSnapshotForAnswer($answer, null);
+        $questionType = (string) ($questionSnapshot['type'] ?? '');
 
-        if (! in_array((string) $question->type, ['short_answer', 'essay'], true)) {
+        if (! in_array($questionType, ['short_answer', 'essay'], true)) {
             throw ValidationException::withMessages([
                 'question_id' => ['Manual grading is only for short_answer or essay question'],
             ]);
         }
 
-        $answer = DB::transaction(function () use ($attempt, $question, $data) {
-            $answer = QuizAnswer::where('attempt_id', $attempt->id)
-                ->where('question_id', $question->id)
-                ->firstOrFail();
-
-            $maxScore = (int) $question->score;
+        $answer = DB::transaction(function () use ($attempt, $answer, $questionSnapshot, $data) {
+            $maxScore = (int) ($questionSnapshot['score'] ?? 0);
             $score = min((int) $data['score'], $maxScore);
 
             $answer->update([
@@ -242,13 +254,15 @@ class QuizAttemptService
                 'score' => $score,
             ]);
 
-            $totalScore = (int) QuizAnswer::where('attempt_id', $attempt->id)->sum('score');
-            $pendingManualReview = QuizAnswer::query()
-                ->join('questions', 'questions.id', '=', 'quiz_answers.question_id')
-                ->where('quiz_answers.attempt_id', $attempt->id)
-                ->whereIn('questions.type', ['short_answer', 'essay'])
-                ->whereNull('quiz_answers.is_correct')
-                ->exists();
+            $answers = QuizAnswer::where('attempt_id', $attempt->id)->get();
+            $totalScore = (int) $answers->sum('score');
+            $pendingManualReview = $answers->contains(function (QuizAnswer $item): bool {
+                $questionSnapshot = $this->resolveQuestionSnapshotForAnswer($item, null);
+                $questionType = (string) ($questionSnapshot['type'] ?? '');
+
+                return in_array($questionType, ['short_answer', 'essay'], true)
+                    && $item->is_correct === null;
+            });
 
             $attempt->update([
                 'total_score' => $totalScore,
@@ -267,43 +281,42 @@ class QuizAttemptService
 
     private function persistAnswer(QuizAttempt $attempt, int $quizId, int $questionId, array $data): QuizAnswer
     {
-        $question = Question::where('id', $questionId)
-            ->where('quiz_id', $quizId)
-            ->where('is_active', true)
+        $answer = QuizAnswer::where('attempt_id', $attempt->id)
+            ->where('question_id', $questionId)
             ->firstOrFail();
+        $questionSnapshot = $this->resolveQuestionSnapshotForAnswer($answer, null);
 
-        return DB::transaction(function () use ($attempt, $question, $data) {
+        return DB::transaction(function () use ($answer, $questionSnapshot, $data) {
             $selectedOptionId = $data['selected_option_id'] ?? null;
             $answerText = $data['answer_text'] ?? null;
             $isCorrect = null;
             $score = 0;
 
             if ($selectedOptionId) {
-                $option = Option::where('id', $selectedOptionId)
-                    ->where('question_id', $question->id)
-                    ->firstOrFail();
+                $option = $this->courseSnapshotService->findOptionSnapshot($questionSnapshot, (int) $selectedOptionId);
+                if (! $option) {
+                    throw ValidationException::withMessages([
+                        'selected_option_id' => ['Selected option does not belong to this question.'],
+                    ]);
+                }
 
-                $isCorrect = (bool) $option->is_correct;
-                $score = $isCorrect ? (int) $question->score : 0;
+                $isCorrect = (bool) ($option['is_correct'] ?? false);
+                $score = $isCorrect ? (int) ($questionSnapshot['score'] ?? 0) : 0;
             }
 
-            if ($answerText && ! in_array((string) $question->type, ['short_answer', 'essay'], true)) {
+            if ($answerText && ! in_array((string) ($questionSnapshot['type'] ?? ''), ['short_answer', 'essay'], true)) {
                 $isCorrect = false;
                 $score = 0;
             }
 
-            return QuizAnswer::updateOrCreate(
-                [
-                    'attempt_id' => $attempt->id,
-                    'question_id' => $question->id,
-                ],
-                [
-                    'selected_option_id' => $selectedOptionId,
-                    'answer_text' => $answerText,
-                    'is_correct' => $isCorrect,
-                    'score' => $score,
-                ]
-            );
+            $answer->update([
+                'selected_option_id' => $selectedOptionId,
+                'answer_text' => $answerText,
+                'is_correct' => $isCorrect,
+                'score' => $score,
+            ]);
+
+            return $answer->fresh();
         });
     }
 
@@ -316,39 +329,17 @@ class QuizAttemptService
 
     private function findQuizForEnrollment(int $enrollmentId, int $quizId, bool $allowInactive): Quiz
     {
-        $enrollment = Enrollment::with('courseOffering')->findOrFail($enrollmentId);
-        $courseId = $enrollment->courseOffering?->course_id;
-        if (! $courseId) {
+        $enrollment = Enrollment::findOrFail($enrollmentId);
+        $quiz = $this->enrollmentService->findVisibleQuizForEnrollment($enrollment, $quizId, true, $allowInactive);
+        if (! $quiz) {
             throw ValidationException::withMessages([
-                'course_offering_id' => ['Enrollment is missing a valid course offering reference.'],
+                'quiz_id' => ['Quiz tidak tersedia untuk enrollment ini.'],
             ]);
         }
 
-        $query = Quiz::where('id', $quizId)
-            ->where('course_id', $courseId);
+        Quiz::withTrashed()->findOrFail($quizId);
 
-        if (! $allowInactive) {
-            $query->where('is_active', true);
-        }
-
-        return $query->firstOrFail();
-    }
-
-    private function assertQuizIsOpenForAttempt(Quiz $quiz): void
-    {
-        $now = now();
-
-        if ($quiz->open_at && $now->lt($quiz->open_at)) {
-            throw ValidationException::withMessages([
-                'quiz_id' => ['Quiz is not open yet. Please wait until the quiz open time.'],
-            ]);
-        }
-
-        if ($quiz->close_at && $now->gt($quiz->close_at)) {
-            throw ValidationException::withMessages([
-                'quiz_id' => ['Quiz has closed. New attempts or submissions are no longer allowed.'],
-            ]);
-        }
+        return $quiz;
     }
 
     private function assertAttemptWithinDuration(QuizAttempt $attempt, Quiz $quiz): void
@@ -412,5 +403,91 @@ class QuizAttemptService
                 ),
             ],
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function requireQuizSnapshotForEnrollment(Enrollment $enrollment, int $quizId): array
+    {
+        $quizSnapshot = $this->enrollmentService->findQuizSnapshotForEnrollment($enrollment, $quizId);
+
+        if ($quizSnapshot !== null) {
+            return $quizSnapshot;
+        }
+
+        $quiz = $this->enrollmentService->findVisibleQuizForEnrollment($enrollment, $quizId, true, true);
+        if (! $quiz) {
+            throw ValidationException::withMessages([
+                'quiz_id' => ['Quiz tidak tersedia untuk enrollment ini.'],
+            ]);
+        }
+
+        return $this->courseSnapshotService->makeQuizSnapshotFromModel($quiz);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveQuestionSnapshotForAnswer(QuizAnswer $answer, ?array $quizSnapshot = null): array
+    {
+        if (is_array($answer->question_snapshot)) {
+            return $answer->question_snapshot;
+        }
+
+        if ($quizSnapshot !== null) {
+            $questionSnapshot = $this->courseSnapshotService->findQuestionSnapshot($quizSnapshot, (int) $answer->question_id);
+            if ($questionSnapshot !== null) {
+                return $questionSnapshot;
+            }
+        }
+
+        $question = Question::withTrashed()
+            ->with(['options' => fn ($query) => $query->withTrashed()->orderBy('id')])
+            ->findOrFail((int) $answer->question_id);
+
+        return [
+            'id' => (int) $question->id,
+            'quiz_id' => (int) $question->quiz_id,
+            'question_text' => $question->question_text,
+            'image_url' => $question->image_url,
+            'type' => $question->type,
+            'score' => (int) ($question->score ?? 0),
+            'sort_order' => $question->sort_order !== null ? (int) $question->sort_order : null,
+            'is_active' => (bool) $question->is_active,
+            'options' => $question->options
+                ->map(fn (Option $option) => [
+                    'id' => (int) $option->id,
+                    'question_id' => (int) $option->question_id,
+                    'option_text' => $option->option_text,
+                    'image_url' => $option->image_url,
+                    'is_correct' => (bool) $option->is_correct,
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $questions
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function normalizeQuestionScoresForAttempt(\Illuminate\Support\Collection $questions): \Illuminate\Support\Collection
+    {
+        $totalQuestions = $questions->count();
+        if ($totalQuestions === 0) {
+            return $questions->values();
+        }
+
+        $baseScore = intdiv(100, $totalQuestions);
+        $remainder = 100 % $totalQuestions;
+
+        return $questions
+            ->values()
+            ->map(function (array $question, int $index) use ($baseScore, $remainder): array {
+                $question['score'] = $baseScore + ($index < $remainder ? 1 : 0);
+
+                return $question;
+            });
     }
 }

@@ -170,9 +170,9 @@ it('returns real admin dashboard metrics from database data', function () {
         ->assertJsonPath('data.metrics.0.note', '3 akun aktif saat ini')
         ->assertJsonPath('data.metrics.1.label', 'Total Courses')
         ->assertJsonPath('data.metrics.1.value', '1')
-        ->assertJsonPath('data.metrics.2.label', 'Transaksi Bulan Ini')
+        ->assertJsonPath('data.metrics.2.label', 'Transaksi Periode Ini')
         ->assertJsonPath('data.metrics.2.value', '1')
-        ->assertJsonPath('data.metrics.2.note', 'Rp400.000 transaksi sukses bulan ini')
+        ->assertJsonPath('data.metrics.2.note', 'Rp400.000 transaksi sukses periode ini')
         ->assertJsonPath('data.metrics.3.label', 'Voucher Aktif')
         ->assertJsonPath('data.metrics.3.value', '1')
         ->assertJsonPath('data.metrics.3.note', '1 voucher berakhir <= 7 hari');

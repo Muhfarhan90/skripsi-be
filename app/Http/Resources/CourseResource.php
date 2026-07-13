@@ -95,15 +95,14 @@ class CourseResource extends JsonResource
                                             'weight' => $quiz->weight,
                                             'is_active' => $quiz->is_active,
                                             'is_random' => $quiz->is_random,
+                                            'question_limit' => $quiz->question_limit,
                                             'max_attempts' => $quiz->max_attempts,
                                         ];
                                     })
                                 : [],
                             'assignments' => $section->relationLoaded('assignments')
                                 ? $section->assignments
-                                    ->sortBy(function ($assignment) {
-                                        return $assignment->due_at?->getTimestamp() ?? PHP_INT_MAX;
-                                    })
+                                    ->sortBy('id')
                                     ->values()
                                     ->map(function ($assignment) {
                                         return [

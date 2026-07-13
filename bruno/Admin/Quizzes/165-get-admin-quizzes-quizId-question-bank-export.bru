@@ -1,0 +1,24 @@
+meta {
+  name: GET quizzes.question-bank.export
+  type: http
+  seq: 165
+}
+
+get {
+  url: {{baseUrl}}/admin/quizzes/{{quizId}}/question-bank/export
+  auth: bearer
+}
+
+headers {
+  Accept: text/plain, application/json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  URI: api/admin/quizzes/{quizId}/question-bank/export
+  Action: App\Http\Controllers\Api\Admin\QuestionController@exportForQuiz
+  Middleware: api, Illuminate\Auth\Middleware\Authenticate:sanctum, App\Http\Middleware\EnsureAdminAccess
+}
